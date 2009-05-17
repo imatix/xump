@@ -1,0 +1,12 @@
+Makefile
+Makefile.unix
+Makefile.win32
+boomake
+boomake.bat
+boomakew.bat
+configure
+configure.bat
+libxump.vcproj
+stamp_generate
+version.h
+
