@@ -29,8 +29,9 @@
 <inherit filename = "smt_classes.pdl" />
 
 <file name = "version.h"               class = "c version"         >Project version file</file>
-<file name = "libamq_xump"             class = "public library"    >Object library</file>
+<file name = "libxump"                 class = "public library"    >Object library</file>
 
+<!--
 <file name = "xump_config.opf"         class = "gsl data"          >Configuration schema</file>
 <file name = "xump_config.icl"         class = "icl private class"
                                        generated = "1"             >Configuration class</file>
@@ -44,5 +45,5 @@
 
 <file name = "xump_static.rc"          class = "ipr rc file"       >Static resources</file>
 <file name = "xump_base.cfg"           class = "private resource"  >Base config file</file>
-
+-->
 </pdl>
