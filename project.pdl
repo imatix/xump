@@ -1,0 +1,48 @@
+<?xml?>
+<!--
+    Copyright (c) 2007-2009 iMatix Corporation
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or (at
+    your option) any later version.
+
+    This program is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    For information on alternative licensing for OEMs, please contact
+    iMatix Corporation.
+-->
+
+<pdl
+    name      = "Xump"
+    version   = "0.1"
+    workflow  = "standard.pwl"
+    library   = "libxump"
+    copyright = "Copyright (c) 2009 iMatix Corporation"
+    >
+<include filename = "prelude.pdl" />
+<inherit filename = "icl_classes.pdl" />
+<inherit filename = "ipr_classes.pdl" />
+<inherit filename = "smt_classes.pdl" />
+
+<file name = "version.h"               class = "c version"         >Project version file</file>
+<file name = "libamq_xump"             class = "public library"    >Object library</file>
+
+<file name = "xump_config.opf"         class = "gsl data"          >Configuration schema</file>
+<file name = "xump_config.icl"         class = "icl private class"
+                                       generated = "1"             >Configuration class</file>
+<file name = "xump_backend.icl"        class = "ipr portal"        >Portal to backend handler</file>
+<file name = "xump_resource.icl"       class = "ipr portal"        >Portal to resource handler</file>
+<file name = "xump_domain.icl"         class = "icl public class"  >RestMS domain resource</file>
+<file name = "xump_feed.icl"           class = "icl public class"  >RestMS feed resource</file>
+<file name = "xump_pipe.icl"           class = "icl public class"  >RestMS pipe resource</file>
+<file name = "xump_join.icl"           class = "icl public class"  >RestMS join resource</file>
+<file name = "xump_classes.icl"        class = "icl public data"   >Application classes</file>
+
+<file name = "xump_static.rc"          class = "ipr rc file"       >Static resources</file>
+<file name = "xump_base.cfg"           class = "private resource"  >Base config file</file>
+
+</pdl>

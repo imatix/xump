@@ -1,0 +1,202 @@
+Extensible Universal Message Processor
+
+This entire project is in scratch mode, it will not build or even read sensibly.  Patience... :-)
+
+
+++ General principles
+
+XUMP is an API specification that defines the behaviour of a messaging engine.  An XUMP engine is meant to be provide the heart and lungs of a message broker application.  XUMP is designed to be embeddable in applications written in any language.
+
+The XUMP engine manages a set of message queues through which messages flow.  Messages flow through one or more "queues" in a directed network of any complexity.  Messages are read from queues by "selectors", which may provide messages to the calling application, or to other queues.  The calling application constructs this network dynamically by creating queues, readers, and other resources through XUMP.
+
+The calling application works with XUMP resources through "references", which are engine-generated identifiers.  Resources are managed through four methods: Create (which returns a new identifier), Retrieve, Update, and Delete.
+
+Queues are strictly first-in first-out and hold a single list of messages.  Applications can manage multiple priorities by creating multiple parallel queues and routing messages into these queues depending on message priority.  Similarly, applications can implement "fair queuing" by selecting messages fairly from several producer queues into a single queue.
+
+The semantics of queue storage are defined by the application.  That is, the calling application can provide its own implementations for queue creation and management and message storage, retrieval, and deletion.
+
+Messages consist of an envelope (a set of properties) and a set of contents (zero or more binary MIME typed blobs).  For messages larger than a cut-off (e.g. 30 octets) XUMP uses a "zero-copy" rule to avoid copying contents.
+
+Selectors specify a source queue, a set of matching criteria, a set of filter criteria, a transformation, and an optional target queue.  The transformations are "move", "copy", and "delete".  Internally, move and copy transformations are presumably done using references.
+
+Matching and filtering are two distinct operations.  Matching is a collective operation that is done atomically by all selectors on a specific queue, on individual messages.  Matching criteria are constrained to algorithmic comparisons on zero or more string values in the message envelope.  Filtering is done independently by selectors on messages, and can involve arbitrary computation on the message envelope and/or contents.
+
+In both matching and filtering, the specific algorithms are provided by the calling application.  The engine is responsible for managing the matching tables.
+
+++ Message envelope
+
+The envelope contains: a string address, a numeric priority, and a set of named string fields that can be used for any purpose.  Routing often happens on the address but this is not obligatory.
+
+++ Selector wiring
+
+Here is how an application reads off a queue:
+
+[[code]]
+Queue
+    -> Selector
+        -> Recipient
+[[/code]]
+
+If two or more applications share a queue, the flow of messages depends on the transformation.  Here is how two applications divide the flow of messages on a queue:
+
+[[code]]
+Queue
+    -> Selector MOVE
+        -> Recipient
+    -> Selector MOVE
+        -> Recipient
+[[/code]]
+
+Here is how two applications each get the full flow of messages:
+
+[[code]]
+Queue
+    -> Selector COPY
+        -> Recipient
+    -> Selector COPY
+        -> Recipient
+[[/code]]
+
+A mix of selector transformations is valid.  Here is how two applications divide the work on a queue, while a third gets a copy of every message:
+
+[[code]]
+Queue
+    -> Selector MOVE
+        -> Recipient
+    -> Selector MOVE
+        -> Recipient
+    -> Selector COPY
+        -> Recipient
+[[/code]]
+
+++ Persistence
+
+Persistence is defined at the queue level.  Any queue can be persistent, if the calling application provides the necessary support.  Message and queue persistence is independent, so that a single message can be held in multiple persistent queues, without creating duplicate work.  The persistent queues hold references to the message, rather than copies of it.
+
+This is a classic persistent shared queue:
+
+[[code]]
+Queue with persistence
+    -> Selector MOVE
+        -> Recipient
+    -> Selector MOVE
+        -> Recipient
+[[/code]]
+
+Here is a fanout queue with independent persistence for one of the recipients:
+
+[[code]]
+Queue
+    -> Selector COPY
+        -> Recipient
+    -> Selector COPY
+            -> Queue with persistence
+                -> Selector MOVE
+                    -> Recipient
+[[/code]]
+
+++ Delivery semantics
+
+The selector "copy" and "move" transformations deliver the message to the recipient if no target queue is specified.  The copy transformation is a pure streaming operation with no confirmation from the receipient.  The move transformation can be streamed or confirmed.  In the latter case, each message is confirmed by the recipient, and the selector is inactive until that confirmation is received.  Unconfirmed messages are pushed back onto the queue if the recipient disappears.
+
+++ Scenarios
+
+Here is the Housecat pattern for a recipient called "cat":
+
+[[code]]
+Sender
+    -> Queue
+        -> Selector address EQ "cat" COPY
+            -> Recipient
+[[/code]]
+
+Where a generous selector specifies a literal match on the message address.  Alternatively, messages for a specific recipient can be held on a queue which allows persistence to be added:
+
+[[code]]
+Sender
+    -> Queue
+        -> Selector address EQ "cat" COPY
+            -> Queue
+                -> Selector MOVE
+                    -> Recipient
+[[/code]]
+
+Multiple selectors can operate on the same queue with independent downstream processing:
+
+[[code]]
+Sender
+    -> Queue
+        -> Selector address EQ "cat" COPY
+            -> Recipient
+        -> Selector address EQ "cat" COPY
+            -> Queue
+                -> Selector MOVE
+                    -> Recipient
+        -> Selector address EQ "dog" COPY
+            -> Recipient
+[[/code]]
+
+Here is the Parrot pattern for a set of recipients:
+
+[[code]]
+Sender
+    -> Queue
+        -> Selector address like "rec.pets.*" COPY
+            -> Recipient
+        -> Selector address like "rec.pets.dogs" COPY
+            -> Queue
+                -> Selector MOVE
+                    -> Recipient
+        -> Selector address like "rec.pets.cats" COPY
+            -> Recipient
+[[/code]]
+
+Here is the Wolfpack pattern for a set of recipients:
+
+[[code]]
+Sender
+    -> Queue
+        -> Selector address EQ "wolf" COPY
+            -> Queue
+                -> Selector MOVE
+                    -> Recipient
+                -> Selector MOVE
+                    -> Recipient
+                -> Selector MOVE
+                    -> Recipient
+[[/code]]
+
+++ Control API
+
+Object properties are represented as structures.  Structures are allocated and destroyed using:
+
+* ref = objclass_new ();
+* objclass_destroy (&ref);
+
+Objects are referred to by a numeric identifier and accessed via CRUD interface:
+
+* id = objclass_create (ref);           #   Create object as specified
+* objclass_retrieve (id, ref);
+* objclass_update (id, ref);
+* objclass_delete (id);
+
+struct xpmi_queue_t
+
+queue = xump_queue_new ();
+xump_queue_create (queue,
+
+
+
+
+* id = objclass.Create (name, type, object)
+* objclass.Delete (id)
+* objclass.Retrieve (id, object)
+* objclass.Update (id, object)
+
+objclasses:
+
+* Queue
+* Selector
+
+++ Semantic API
+
