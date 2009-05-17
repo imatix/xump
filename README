@@ -1,0 +1,35 @@
+Xump - an Extensible Universal Message Processor
+
+++ Summary
+
+Xump is a project to build a generic messaging engine that can be used as the core for a modern message processing broker.
+
+++ Overview
+
+The goals of the Xump project are (a) to deliver a working engine for the iMatix Zyre and OpenAMQ messaging brokers, and (b) to deliver a reusable design for implementations in other languages.
+
+Xump consists of two main layers:
+
+* The message queue storage layer
+* The routing layer
+
+In both cases, semantics and specific implementations are provided as plugins, which is the extensible part of Xump.  By allowing arbitrary semantics, Xump should be able to handle any messaging scenario, including AMQP/0.9, AMQP/1.0, RSS, AtomPub, and RestMS with arbitrary profiles.
+
+++ Implementation
+
+To build Xump you need the iMatix Base/2 tools and GSL4, which are included currently in the [http://www.openamq.org OpenAMQ source kit].
+
+Having built and installed OpenAMQ, you can build Xump as follows:
+
+[[code]]
+boom configure
+boom build
+boom test
+[[/code]]
+
+Or, alternatively, "boom all".
+
+++ Getting help
+
+The current list for discussing Xump is the OpenAMQ-dev list.  Please see http://www.openamq.org for more details.
+
