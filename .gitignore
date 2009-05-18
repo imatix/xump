@@ -9,4 +9,20 @@ configure.bat
 libxump.vcproj
 stamp_generate
 version.h
+libxump.a
+xump_config.c
+xump_config.h
+xump_config.icl
+xump_config.o
+xump_config.txt
+xump_config_test
+xump_config_test.c
+xump_config_test.o
+xump_static.c
+xump_static.h
+xump_static.icl
+xump_static.o
+xump_static_test
+xump_static_test.c
+xump_static_test.o
 
