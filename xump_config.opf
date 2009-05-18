@@ -16,108 +16,129 @@
     iMatix Corporation.
  -->
 <opf
-    name    = "zyre_config"
-    comment = "Zyre configuration properties"
+    name    = "xump_config"
+    comment = "Xump configuration properties"
     script  = "opf_gen"
     root    = "config"
-    config  = "zyre.cfg"
+    config  = "xump.cfg"
     >
-
-<!--
-    This file inherits the configuration properties from the HTTP server config,
-    so that Zyre users do not need to manage two config files.  Since we use
-    the http library in Zyre, we load configuration data into http_config as
-    that library expects.
- -->
-
-<inherit filename = "http_config.opf" />
 
 <public>
 extern $\(selftype)
-    *zyre_config;                     //  Zyre properties object
+    *xump_config;                   //  Server properties object
 </public>
 
 <private>
 $\(selftype)
-    *zyre_config = NULL;
+    *xump_config = NULL;            //  Server properties
 </private>
 
-<path name = "server">
-    <property name = "name" type = "char *" default = "www.zyre.com" prefix = "server">
-    Announced server name
+<path name = "engine">
+    <property name = "animate" type = "Bool" default = "0">
+    Animate engine activity?
     <doc>
-    Specifies the Server: header field name for HTTP responses.
+    If set, Xump displays all activity, which can be useful for debugging.
+    Do not enable this with even modest loads because you will get huge
+    amounts of output.
     </doc>
     </property>
 </path>
 
-<path name = "restms" prefix = "restms">
-    <property name = "debug" type = "Bool" default = "0">
-    Debug RestMS activity?
+<path name = "logging">
+    <property name = "log_path" type = "char *" default = "/var/log/xump">
+    Active log file directory
     <doc>
-    Specifies whether RestMS activity is logged or not.  Use this if you are
-    unsure of what exactly Zyre is doing for the RestMS requests you are
-    sending it.
+    Specifies the directory into which active log files are placed.
+    </doc>
+    </property>
+
+    <property name = "keep logs" type = "Bool" default = "1">
+    Keep log files
+    <doc>
+    Specifies whether or not the server should keep logs.  If zero,
+    the server will not keep logs.  If 1, it will keep an alert log,
+    an access log, and a debug log as specified.
+    </doc>
+    </property>
+
+    <property name = "archive cmd" type = "char *">
+    Archive log file command
+    <doc>
+    If specified, this command is run on all archived log files. You can
+    use this option to compress archived log files, or clean up old and
+    unwanted files.  When the command is run, the name of the archived
+    log file is provided to it as a single argument.
+    </doc>
+    </property>
+
+    <property name = "alert log" type = "char *" default = "alert.log">
+    Error log file name
+    <doc>
+    The name of the alert log file, which records all errors and warnings
+    issued by the server.  Note that the server port number is always added
+    to the name of the log file.
+    </doc>
+    </property>
+
+    <property name = "access log" type = "char *" default = "access.log">
+    Access log file name
+    <doc>
+    The name of the access log file, which records all HTTP requests in
+    the specified access log format. Note that the server port number is
+    always added to the name of the log file.
+    </doc>
+    </property>
+
+    <property name = "debug log" type = "char *" default = "debug.log">
+    Debug log file name
+    <doc>
+    The name of the debug log file, which records all normal activity,
+    errors, and debug trace information. Note that the server port number
+    is always added to the name of the log file.
+    </doc>
+    </property>
+
+    <property name = "syslog" type = "int" default = "0">
+    Use syslog logging protocol
+    <doc>
+    Specifies whether or not to use the syslog protocol for logging.
+    By default log files are written directly to disk.  If this option
+    is set to 1, uses the syslog protocol for all log files.  Uses a
+    priority depending on the type of log message (LOG_ERROR, LOG_INFO,
+    LOG_DEBUG). Uses the LOG_DAEMON facility.  Has no effect on Windows.
+    Overrides the keep_logs option.
     </doc>
     </property>
 </path>
 
-<path name = "amqp" prefix = "amqp">
-    <property name = "autorun" type = "char *" default = "amq_server">
-    AMQP server to start
+<path name = "security">
+    <property name = "user" type = "char *">
+    User to run server as
     <doc>
-    Specifies the broker to start, when Zyre starts.
+    If you specify a user and group, the server will switch to that user
+    and group after opening its port, thus dropping any privileges it
+    previously had.
     </doc>
     </property>
 
-    <property name = "hostname" type = "char *" default = "localhost:5672">
-    AMQP server to connect to
+    <property name = "group" type = "char *">
+    Group to run server as
     <doc>
-    Specifies the hostname and optionally port number to connect to.
-    </doc>
-    </property>
-
-    <property name = "username" type = "char *" default = "guest">
-    AMQP user name
-    <doc>
-    Specifies the user name to use for AMQP connections.
-    </doc>
-    </property>
-
-    <property name = "password" type = "char *" default = "guest">
-    AMQP password
-    <doc>
-    Specifies the password to use for AMQP connections.  Credentials are
-    always passed using the SASL BASIC mechanism.
-    </doc>
-    </property>
-
-    <property name = "timeout" type = "int" default = "5">
-    Peering timeout, seconds
-    <doc>
-    Defines the maximum amount of time connection negotiation may take,
-    before the connection is forcibly closed by the client.
-    </doc>
-    </property>
-
-    <property name = "trace" type = "int" default = "0">
-    AMQP trace level
-    <doc>
-    Specifies the AMQP protocol trace level, which can be 0 (no tracing),
-    1 (show information and protocol methods), 2 (show protocol animation),
-    3 (show wire-level data).
-    </doc>
-    </property>
-
-    <property name = "debug" type = "Bool" default = "0">
-    Debug peering messages?
-    <doc>
-    Specifies whether AMQP peering activity is logged or not.
+    If you specify a user and group, the server will switch to that user
+    and group after opening its port, thus dropping any privileges it
+    previously had.
     </doc>
     </property>
 </path>
 
-<!-- These paths are allowed, but ignored -->
-<path name = "security" />
+<path name = "tuning">
+    <property name = "working threads" type = "int" default = "4">
+    Number of working OS threads
+    <doc>
+    On multithreaded builds, defines the number of OS threads dedicated to
+    processing.
+    </doc>
+    </property>
+</path>
 
 </opf>

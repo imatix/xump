@@ -31,10 +31,13 @@
 <file name = "version.h"               class = "c version"         >Project version file</file>
 <file name = "libxump"                 class = "public library"    >Object library</file>
 
-<!--
 <file name = "xump_config.opf"         class = "gsl data"          >Configuration schema</file>
 <file name = "xump_config.icl"         class = "icl private class"
                                        generated = "1"             >Configuration class</file>
+<file name = "xump_static.rc"          class = "ipr rc file"       >Static resources</file>
+<file name = "xump_base.cfg"           class = "private resource"  >Base config file</file>
+
+<!--
 <file name = "xump_backend.icl"        class = "ipr portal"        >Portal to backend handler</file>
 <file name = "xump_resource.icl"       class = "ipr portal"        >Portal to resource handler</file>
 <file name = "xump_domain.icl"         class = "icl public class"  >RestMS domain resource</file>
@@ -43,7 +46,5 @@
 <file name = "xump_join.icl"           class = "icl public class"  >RestMS join resource</file>
 <file name = "xump_classes.icl"        class = "icl public data"   >Application classes</file>
 
-<file name = "xump_static.rc"          class = "ipr rc file"       >Static resources</file>
-<file name = "xump_base.cfg"           class = "private resource"  >Base config file</file>
 -->
 </pdl>
