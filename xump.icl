@@ -32,38 +32,61 @@ of this class.
 <inherit class = "xump_store_front" />
 
 <import class = "asl" />
+<import class = "xump_store" />
 <import class = "xump_store_ram" />
+<import class = "xump_queue" />
 
 <context>
+    <property name = "store" type = "xump_store_t *" readonly = "1" />
 </context>
 
 <method name = "new">
     <doc>
     Creates a new Xump engine instance.  Xump engines are unnamed containers
-    for stores.
+    for stores.  For now we create one store instance.
     </doc>
     <local>
-    xump_store_t
-        *store;
     </local>
     //
     //  Register RAM storage back-end
-    store = xump_store_ram__xump_store_new (NULL, "RAM");
-    xump__xump_store_bind (self, store);
-    xump_store_request_announce (store);
-    xump_store_unlink (&store);
+    self->store = xump_store_ram__xump_store_new (NULL, "RAM");
+    xump__xump_store_bind (self, self->store);
+    xump_store_request_announce (self->store);
 </method>
 
 <method name = "destroy">
+    xump_store_unlink (&self->store);
 </method>
 
 <method name = "selftest">
     <local>
     xump_t
         *xump;
+    xump_queue_t
+        *queue;
+    int
+        rc;
+    int count1, count2;
     </local>
     //
     xump = xump_new ();
+
+    queue = xump_queue_new (xump_store (xump), "Test queue");
+
+    for (count1 = 0; count1 < 1000000; count1++) {
+        for (count2 = 0; count2 < 1000; count2++) {
+            rc = xump_queue_create (queue);
+        }
+    }
+    assert (rc == -1);
+    rc = xump_queue_fetch (queue);
+    assert (rc == -1);
+    rc = xump_queue_update (queue);
+    assert (rc == -1);
+    rc = xump_queue_delete (queue);
+    assert (rc == -1);
+    xump_queue_destroy (&queue);
+
     xump_destroy (&xump);
 </method>
 

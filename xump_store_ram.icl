@@ -39,4 +39,24 @@ portal to this back-end are destroyed.
     icl_console_print ("I: initializing RAM-based storage instance '%s'", portal->name);
 </method>
 
+<method name = "queue create">
+    assert (queue);
+    rc = -1;
+</method>
+
+<method name = "queue fetch">
+    assert (queue);
+    rc = -1;
+</method>
+
+<method name = "queue update">
+    assert (queue);
+    rc = -1;
+</method>
+
+<method name = "queue delete">
+    assert (queue);
+    rc = -1;
+</method>
+
 </class>

@@ -27,6 +27,7 @@
 <inherit filename = "icl_classes.pdl" />
 <inherit filename = "ipr_classes.pdl" />
 <inherit filename = "smt_classes.pdl" />
+<inherit filename = "opf_classes.pdl" />
 
 <file name = "version.h"               class = "c version"         >Project version file</file>
 <file name = "libxump"                 class = "public library"    >Object library</file>
@@ -35,19 +36,16 @@
 <file name = "xump_store_ram.icl"      class = "icl private class" >RAM based store</file>
 <file name = "xump.icl"                class = "icl public class"  >Xump engine</file>
 <file name = "xump_queue.icl"          class = "icl public class"  >Xump queue reference</file>
-<file name = "xump_message.icl"        class = "icl public class"  >Xump message reference</file>
-<file name = "xump_field.icl"          class = "icl public class"  >Xump field reference</file>
 
-<file name = "xump_config.opf"         class = "gsl data"          >Configuration schema</file>
-<file name = "xump_config.icl"         class = "icl private class"
-                                       generated = "1"             >Configuration class</file>
+<file name = "xump_config.opf"         class = "opf metadata"      >Configuration schema</file>
 <file name = "xump_static.rc"          class = "ipr rc file"       >Static resources</file>
 <file name = "xump_base.cfg"           class = "private resource"  >Base config file</file>
 
 <!--
+<file name = "xump_message.icl"        class = "icl public class"  >Xump message reference</file>
+<file name = "xump_field.icl"          class = "icl public class"  >Xump field reference</file>
 <file name = "xump_store_fs.icl"       class = "icl private class" >File-system based store</file>
 <file name = "xump_message.icl"        class = "icl public class"  >Message class</file>
-<file name = "xump_envelope.icl"       class = "icl public class"  >Envelope class</file>
 <file name = "xump_classes.icl"        class = "icl public data"   >Application classes</file>
 -->
 </pdl>

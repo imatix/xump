@@ -4,6 +4,11 @@ Notes, in reverse chronological order.
 
 ++ 2009-06-02
 
+A portal can do about 130M requests per second, on one 3GHz core.  So, about
+
+
+++ 2009-06-02
+
 This single threaded version will let us prototype the APIs.  For now, the APIs will be synchronous, that is, the caller requests something, and gets a response when the work has been done.  The called object and the calling object occupy the same thread.
 
 Let's explore the queue-message-field API further.  We define this API as portal requests in the xump_store.icl class.  Roughly:
@@ -28,6 +33,8 @@ The reasons for this not-quite-OO design:
 * It lets us define resources that have different life cycles than objects, which we need to define persistent resources (that remain alive when the application stops).
 * It lets us do concurrent access to shared resources in a safe fashion.
 * It lets us hide the implementation of the resources from the calling application.
+
+The word "retrieve" is annoying to type, so I'll use "fetch" instead.  The more often we use a word, the shorter and simpler it should be.
 
 ++ 2009-06-01
 

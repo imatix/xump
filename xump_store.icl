@@ -34,6 +34,7 @@
 </inherit>
 
 <import class = "asl" />
+<import class = "xump" />
 
 <context>
     icl_shortstr_t
@@ -42,9 +43,42 @@
 
 <data>
     <request name = "announce" />
+
+    <request name = "queue create">
+        <doc>
+        Creates a new queue in the store.  If the name is null, generates a
+        queue name.  The queue may already exist. Returns 0 if OK, -1 if the
+        request failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+    </request>
+    <request name = "queue fetch">
+        <doc>
+        Fetches a queue from the store, by name. Returns 0 if OK, -1 if the
+        request failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+    </request>
+    <request name = "queue update">
+        <doc>
+        Updates a queue in the store.  The caller must previous have fetched
+        or created the queue. Returns 0 if OK, -1 if the request failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+    </request>
+    <request name = "queue delete">
+        <doc>
+        Deletes a queue in the store.  The caller must previous have fetched
+        or created the queue. Returns 0 if OK, -1 if the request failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+    </request>
 </data>
 
 <method name = "new">
+    <doc>
+    Creates a new store instance object.
+    </doc>
     <argument name = "name" type = "char *" />
     icl_shortstr_cpy (self->name, name);
 </method>
