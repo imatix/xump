@@ -52,24 +52,20 @@
         </doc>
         <field name = "queue" type = "xump_queue_t *">Queue object</field>
     </request>
+
     <request name = "queue fetch">
         <doc>
-        Fetches a queue from the store, by name. Returns 0 if OK, -1 if the
-        request failed.
+        Fetches a queue from the store, by name. The queue must exist.
+        Returns 0 if OK, -1 if the request failed.
         </doc>
         <field name = "queue" type = "xump_queue_t *">Queue object</field>
     </request>
-    <request name = "queue update">
-        <doc>
-        Updates a queue in the store.  The caller must previous have fetched
-        or created the queue. Returns 0 if OK, -1 if the request failed.
-        </doc>
-        <field name = "queue" type = "xump_queue_t *">Queue object</field>
-    </request>
+
     <request name = "queue delete">
         <doc>
         Deletes a queue in the store.  The caller must previous have fetched
-        or created the queue. Returns 0 if OK, -1 if the request failed.
+        or created the queue. Returns 0 if OK, -1 if the request failed.  The
+        queue does not need to exist - delete is idempotent.
         </doc>
         <field name = "queue" type = "xump_queue_t *">Queue object</field>
     </request>

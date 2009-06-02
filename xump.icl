@@ -34,6 +34,7 @@ of this class.
 <import class = "asl" />
 <import class = "xump_store" />
 <import class = "xump_store_ram" />
+<import class = "xump_store_ram_queue" />
 <import class = "xump_queue" />
 
 <context>
@@ -92,7 +93,9 @@ of this class.
     xump_store_t
         *store;
     xump_queue_t
-        *queue;
+        *queue = NULL;
+    icl_shortstr_t
+        queue_name;
     </local>
     //
     xump = xump_new ();
@@ -101,17 +104,41 @@ of this class.
 
     assert (xump_store (xump, "RAM1") != NULL);
     assert (xump_store (xump, "RAM0") == NULL);
-
     store = xump_store (xump, "RAM1");
-    queue = xump_queue_new (store, "Test queue");
 
-    //  Check that every methods fails properly
-    assert (xump_queue_create (queue) == -1);
-    assert (xump_queue_fetch  (queue) == -1);
-    assert (xump_queue_update (queue) == -1);
-    assert (xump_queue_delete (queue) == -1);
+    //  Check that the methods work
+    queue = xump_queue_create (store, "Test queue");
+    assert (queue);
+    xump_queue_unlink (&queue);
 
-    xump_queue_destroy (&queue);
+    queue = xump_queue_fetch (store, "Test queue");
+    assert (queue);
+    xump_queue_delete (&queue);
+    assert (queue == NULL);
+    queue = xump_queue_fetch (store, "Test queue");
+    assert (queue == NULL);
+
+    //  Check methods on auto-named queue
+    queue = xump_queue_create (store, NULL);
+    assert (queue);
+    icl_shortstr_cpy (queue_name, xump_queue_name (queue));
+    xump_queue_unlink (&queue);
+
+    queue = xump_queue_fetch (store, queue_name);
+    assert (queue);
+    xump_queue_delete (&queue);
+    assert (queue == NULL);
+    queue = xump_queue_fetch (store, queue_name);
+    assert (queue == NULL);
+
+    //  Create some queues, should be freed when we exit
+    queue = xump_queue_create (store, NULL);
+    xump_queue_unlink (&queue);
+    queue = xump_queue_create (store, NULL);
+    xump_queue_unlink (&queue);
+    queue = xump_queue_create (store, NULL);
+    xump_queue_unlink (&queue);
+
     xump_destroy (&xump);
 </method>
 

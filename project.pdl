@@ -34,6 +34,8 @@
 
 <file name = "xump_store.icl"          class = "ipr portal"        >Portal to store handler</file>
 <file name = "xump_store_ram.icl"      class = "icl private class" >RAM based store</file>
+<file name = "xump_store_ram_queue.icl"
+                                       class = "icl private class" >RAM based queue</file>
 <file name = "xump.icl"                class = "icl public class"  >Xump engine</file>
 <file name = "xump_queue.icl"          class = "icl public class"  >Xump queue reference</file>
 

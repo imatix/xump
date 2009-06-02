@@ -31,7 +31,8 @@ the queue.
 </doc>
 
 <inherit class = "icl_object">
-    <option name = "alloc"  value = "cache" />
+    <option name = "alloc" value = "cache" />
+    <option name = "links" value = "1" />
 </inherit>
 
 <import class = "asl" />
@@ -43,7 +44,7 @@ the queue.
     <property name = "name" type = "char *" />
 </context>
 
-<method name = "new">
+<method name = "new" private = "1">
     <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
     <argument name = "name" type = "char *">Queue name, if any</argument>
     //
@@ -51,25 +52,55 @@ the queue.
     xump_queue_set_name (self, name);
 </method>
 
-<method name = "destroy">
+<method name = "destroy" private = "1">
     xump_store_unlink (&self->store);
     icl_mem_free (self->name);
 </method>
 
-<method name = "create" template = "function">
-    rc = xump_store_request_queue_create (self->store, self);
+<method name = "create" return = "self">
+    <doc>
+    This public method creates or fetches a queue in the store.  It acts
+    as a constructor and returns a new queue object when successful.  The
+    caller must unlink this object when finished using it.
+    </doc>
+    <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
+    <argument name = "name" type = "char *">Queue name, if any</argument>
+    <declare name = "self" type = "$(selftype) *" />
+    //
+    self = self_new (store, name);
+    if (self)
+        xump_store_request_queue_create (store, self);
 </method>
 
-<method name = "fetch" template = "function">
-    rc = xump_store_request_queue_fetch (self->store, self);
+<method name = "fetch" return = "self">
+    <doc>
+    This public method fetches a queue in the store.  It acts as a
+    constructor and returns a new queue object when successful.  The
+    caller must unlink this object when finished using it.
+    </doc>
+    <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
+    <argument name = "name" type = "char *">Queue name, if any</argument>
+    <declare name = "self" type = "$(selftype) *" />
+    //
+    self = self_new (store, name);
+    if (self) {
+        if (xump_store_request_queue_fetch (store, self))
+            self_destroy (&self);       //  No such queue, return NULL
+    }
 </method>
 
-<method name = "update" template = "function">
-    rc = xump_store_request_queue_update (self->store, self);
-</method>
-
-<method name = "delete" template = "function">
-    rc = xump_store_request_queue_delete (self->store, self);
+<method name = "delete">
+    <doc>
+    This public method deletes a queue in the store.  It acts as a
+    destructor and nullifies the provided queue object reference.
+    The queue object may already be destroyed.
+    </doc>
+    <argument name = "self_p" type = "$(selftype) **">Queue object ref</argument>
+    assert (self_p);
+    if (*self_p) {
+        xump_store_request_queue_delete ((*self_p)->store, *self_p);
+        self_unlink (self_p);
+    }
 </method>
 
 <method name = "selftest" />

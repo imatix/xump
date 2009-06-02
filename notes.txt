@@ -2,6 +2,50 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-03
+
+Having prototyped the queue API, it looks clumsy.  We'll make these improvements:
+
+* Make the create and fetch methods work like constructors, returning a reference to a newly created object, if successful.
+* Use link counting on the xump_queue object, so we can use unlink instead of destroy.  This is nice because if we don't use new, we should not use destroy either.
+* Scrap the update method, since this does nothing useful.  We can add it back if needed but for now it looks like queue properties are either established at creation time, or read-only.
+
+So while the portal request API still uses the RESTful model, the xump_queue class layers a more fluid object-oriented API on top of that.  This is what the old calling code looked like (from the xump.icl selftest method):
+
+[[code]
+xump_queue_t
+    *queue;
+
+queue = xump_queue_new (store, "Test queue");
+xump_queue_create (queue);
+xump_queue_fetch  (queue);
+xump_queue_update (queue);
+xump_queue_delete (queue);
+xump_queue_destroy (&queue);
+[[/code]]
+
+It's clear, but too different from the normal way of working with iCL objects.  Having new and create, and delete and destroy is confusing.  iCL lets me mark the new and destroy methods as private, so these are not exported to callers.  The revised API looks more elegant:
+
+[[code]]
+xump_queue_t
+    *queue = NULL;
+
+//  Create acts as a constructor
+queue = xump_queue_create (store, "Test queue");
+
+//  Unlink is an soft destructor
+xump_queue_unlink (&queue);
+
+//  Fetch also acts as a constructor
+queue = xump_queue_fetch (store, "Test queue");
+
+//  Delete acts as a hard destructor
+xump_queue_delete (&queue);
+[[/code]]
+
+
+
+
 ++ 2009-06-02
 
 +++ Commit 7e30756: Constructing the portal queue API.
@@ -11,25 +55,25 @@ To make it simple, the engine has a single store instance which is just the 'sto
 How this works now - this is from the xump.icl selftest method:
 
 [[code]]
-    //  Create an engine instance
-    xump_t
-        *xump;
-    xump = xump_new ();
+//  Create an engine instance
+xump_t
+    *xump;
+xump = xump_new ();
 
-    //  Create a queue object within single store
-    xump_queue_t
-        *queue;
-    queue = xump_queue_new (xump_store (xump), "Test queue");
+//  Create a queue object within single store
+xump_queue_t
+    *queue;
+queue = xump_queue_new (xump_store (xump), "Test queue");
 
-    //  Check that every methods fails properly
-    assert (xump_queue_create (queue) == -1);
-    assert (xump_queue_fetch (queue) == -1);
-    assert (xump_queue_update (queue) == -1);
-    assert (xump_queue_delete (queue) == -1);
+//  Check that every methods fails properly
+assert (xump_queue_create (queue) == -1);
+assert (xump_queue_fetch (queue) == -1);
+assert (xump_queue_update (queue) == -1);
+assert (xump_queue_delete (queue) == -1);
 
-    //  Destroy queue object and engine instance
-    xump_queue_destroy (&queue);
-    xump_destroy (&xump);
+//  Destroy queue object and engine instance
+xump_queue_destroy (&queue);
+xump_destroy (&xump);
 [[/code]]
 
 Running the create method a billion times takes around 7.5 seconds on a 3GHz core.  So, about 130M requests/second, 7.5 nanoseconds per request.  No bottleneck here, yet, synchronous portals are fast.
