@@ -1,3 +1,6 @@
+*.o
+*.a
+core
 Makefile
 Makefile.unix
 Makefile.win32
@@ -25,4 +28,18 @@ xump_static.o
 xump_static_test
 xump_static_test.c
 xump_static_test.o
-
+icl_mem_fat.xml
+xump.c
+xump.h
+xump_store.c
+xump_store.h
+xump_store_back.icl
+xump_store_front.icl
+xump_store_ram.c
+xump_store_ram.h
+xump_store_ram_test
+xump_store_ram_test.c
+xump_store_test
+xump_store_test.c
+xump_test
+xump_test.c

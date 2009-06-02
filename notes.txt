@@ -1,66 +1,217 @@
 Extensible Universal Message Processor
 
-This entire project is in scratch mode, it will not build or even read sensibly.  Patience... :-)
+++ 2009-06-01
+
+The xump.icl class provides engine instances.  These isolate some stores, not others.  A RAM-based store sits inside an engine instance.  A disk-based store sits outside the engine instance and can be accessed from any instance.  At this stage we don't do any kind of access control.  So our resource hierarchy changes a little:
+
+[[code]]
+Engine
++-- Store
+    +-- Queue
+        +-- Message
+            +-- Field
+[[/code]]
+
+Starting on the basic framework for the store portal and plugins.  We have these classes:
+
+* xump.icl - engine class
+* xump_store.icl - store portal
+* xump_store_ram.icl - RAM based store stub that says hello
+
+All single threaded, so no SMT, no multicore.  That makes the classes simpler, but for any kind of performance, or when using disk-based persistence, we'll need multithreading.  To be designed later.
 
 
-++ General principles
+What the stub RAM store looks like (trimming comments):
 
-XUMP is an API specification that defines the behaviour of a messaging engine.  An XUMP engine is meant to be provide the heart and lungs of a message broker application.  XUMP is designed to be embeddable in applications written in any language.
+[[code]]
+<?xml?>
+<class
+    name      = "xump_store_ram"
+    comment   = "Xump RAM store back-end"
+    script    = "icl_gen"
+    license   = "gpl"
+    opaque    = "1"
+    >
+<inherit class = "xump_store_back" />
+<method name = "announce">
+    icl_console_print ("I: initializing RAM-based storage layer");
+</method>
+</class>
+[[/code]]
 
-The XUMP engine manages a set of message queues through which messages flow.  Messages flow through one or more "queues" in a directed network of any complexity.  Messages are read from queues by "selectors", which may provide messages to the calling application, or to other queues.  The calling application constructs this network dynamically by creating queues, readers, and other resources through XUMP.
+And this works:
 
-The calling application works with XUMP resources through "references", which are engine-generated identifiers.  Resources are managed through four methods: Create (which returns a new identifier), Retrieve, Update, and Delete.
+[[code]]
+$ boom build
+boom I: [Xump]: Generating files...
+boom I: [Xump]: Building Xump...
+$ boom test
+boom I: [Xump]: Running regression tests...
+[[/code]]
 
-Queues are strictly first-in first-out and hold a single list of messages.  Applications can manage multiple priorities by creating multiple parallel queues and routing messages into these queues depending on message priority.  Similarly, applications can implement "fair queuing" by selecting messages fairly from several producer queues into a single queue.
 
-The semantics of queue storage are defined by the application.  That is, the calling application can provide its own implementations for queue creation and management and message storage, retrieval, and deletion.
 
-Messages consist of an envelope (a set of properties) and a set of contents (zero or more binary MIME typed blobs).  For messages larger than a cut-off (e.g. 30 octets) XUMP uses a "zero-copy" rule to avoid copying contents.
+Working on a more detailed analysis of the xump_store.icl portal class.  A store has a type, which is the implementation (the storage back-end name), and a name (which is the identifier of the particular store instance).  The caller accesses a store by creating a store object.
 
-Selectors specify a source queue, a set of matching criteria, a set of filter criteria, a transformation, and an optional target queue.  The transformations are "move", "copy", and "delete".  Internally, move and copy transformations are presumably done using references.
 
-Matching and filtering are two distinct operations.  Matching is a collective operation that is done atomically by all selectors on a specific queue, on individual messages.  Matching criteria are constrained to algorithmic comparisons on zero or more string values in the message envelope.  Filtering is done independently by selectors on messages, and can involve arbitrary computation on the message envelope and/or contents.
 
-In both matching and filtering, the specific algorithms are provided by the calling application.  The engine is responsible for managing the matching tables.
 
-++ Message envelope
+The xump_portal.icl class needs these methods for working with queues:
 
-The envelope contains: a string address, a numeric priority, and a set of named string fields that can be used for any purpose.  Routing often happens on the address but this is not obligatory.
+* Create (named or unnamed) queue in store, with given properties.
+* Retrieve queue from store by name.
+* Update queue with given properties.
+* Delete queue from store.
 
-++ Selector wiring
+And for working with messages:
 
-Here is how an application reads off a queue:
+* Create new message in queue, with given content and address.
+* Retrieve message from queue (there are various patterns here).
+* Update a message with given properties.
+* Delete message from queue.
+
+And finally, to manipulate fields on messages:
+
+* Create new field on message, with given name and value.
+* Retrieve field from message, by name.
+* Update field value.
+* Delete field from message.
+
+We then need classes to hold queue, message and field references:
+
+* xump_queue.icl, which refers to a queue in a store.
+* xump_message.icl, which refers to a message in a queue.
+* xump_field.icl, which refers to a field in a message.
+
+
+
+++ 2009-05-30
+
+I'm analysing the storage layer, which holds queues and messages in different ways (RAM, file system, SQL database, and so on).  My goal is to make a minimal storage layer using the iPR portal system, with two or three different implementations.  Then, to test these and get performance measurements.  The design for Xump is very roughly this:
+
+[[code]]
++--------------------------------+
+|        Application layer       |
++--------------------------------+
+|          Routing layer         |
++--------------------------------+
+|          Storage layer         |
++----------+----------+----------+
+| Back-end | Back-end | Back-end |
++----------+----------+----------+
+[[/code]]
+
+Making it simpler... what can we ignore for now?  Our use case for Xump (which is a social messaging layer above Wikidot) calls for very high volumes of quite small text messages (80-160 characters).  We would expect thousands of queues, each containing thousands of messages.  We'd want these to be persistent and archived, with messages being held on their queues for as long as the queues existed.
+
+We can ignore messages with multipart contents.  This is an advanced use case and arguably it is not a good one, since it creates messages that are complex for applications to work with.  If my application produces multipart messages, that makes it hard for others to talk to me.  So a framework that allows this may actually be helping me to shoot myself in the foot.
+
+For high volumes of small messages, copying is not a major concern.  We avoid copying by manipulating references, but that is not free.  So, we will for now copy data.  Later, and for larger messages, we'll see about normalizing data so that copying is reduced when the same message is sent to many consumers.
+
+Every single message has an address, which is used heavily, so we will make this a dedicated property of the class.  A message also has content body, content length, and a table of name/value fields.
+
+Let's build the storage system around queues.  That is, a store holds a number of queues, which hold a number of messages.  We can interrogate the store for queues and messages, and it will return us memory objects that we can work with.
+
+The iPR portal system provides a virtual class interface.  Our portal class will be xump_store.icl.  This would have implementations (called "portal back-ends") like xump_store_fs.icl (file system), xump_store_ram.icl, xump_store_sql.icl, and so on.  Each portal back-end instance is equal to a store instance, and implements the portal methods.  Which we can break into:
+
+* Creating and working with queues in a particular store.
+* Creating and working with messages in a particular queue (in its store).
+
+The queues and messages that a store manages are opaque, and invisible as such to the storage layer.  To work with a queue, the caller asks the back-end to provide a queue object.  It can execute methods on this object (some of which may affect the stored queue).  It then destroys the queue object.  Messages are handled in the same way.
+
+We will use the create-retrieve-update-delete pattern for working with queues and messages.  To some extent this mirrors the RESTful pattern for working with remote resources.  In this case, the remote resources sit in a store that is opaque to the caller, which accesses it via the portal interface.
+
+To repeat in a different way: when the caller does xump_queue_destroy(), this destroys a queue object but does not destroy the queue held in the store.
+
+The queue and message objects that the store provides to the calling layer are private, not locked, and not shared (they do not support reference counting).
+
+The simplest workable identifiers for queues are names.  It makes sense that a store can auto-name private queues.  For messages, we can use sequence numbers.
+
+The xump_store.icl portal class needs these methods for working with queues:
+
+* Create (named or unnamed) queue in store, with given properties.
+* Retrieve queue from store by name.
+* Update queue with given properties.
+* Delete queue from store.
+
+And for working with messages:
+
+* Create new message in queue, with given content and address.
+* Retrieve message from queue (there are various patterns here).
+* Update a message with given properties.
+* Delete message from queue.
+
+And finally, to manipulate fields on messages:
+
+* Create new field on message, with given name and value.
+* Retrieve field from message, by name.
+* Update field value.
+* Delete field from message.
+
+We then need classes to hold queue, message and field references:
+
+* xump_queue.icl, which refers to a queue in a store.
+* xump_message.icl, which refers to a message in a queue.
+* xump_field.icl, which refers to a field in a message.
+
+So our resource hierarchy looks like this:
+
+[[code]]
+Store
++-- Queue
+    +-- Message
+        +-- Field
+[[/code]]
+
+++ 2009-05-25
+
+Have added opaque classes to iCL, and released an upgrade of OpenAMQ that uses these in a few places.  Opaque classes work fine except for one common case, when they're used in invasive containers.  We could use the neutral containers but they are a lot of extra work in use.
+
+Decision: all public classes will be opaque and when we need to make lists or tables of them, we'll use the ipr_looseref_list and ipr_hash classes.
+
+So, API classes have this general interface:
+
+objref = myclass_new (arguments);
+objcopy = myclass_link (objref);
+myclass_some_method (objref);
+myclass_unlink (&objcopy);
+
+* All classes are reference counted.
+* All classes are synchronous.
+* All classes are threadsafe.
+* All classes are opaque.
+
+++ 2009-05-17
+
+Xump is meant to become an embeddable messaging engine that solves two recurrent problems (we see in OpenAMQ and Zyre), namely routing and storage.  It should do for messaging products what game engines do for video games.  Standard tactic for software engineering: make 1 and 2 by hand, then solve N with a general solution.
+
+The design of Xump is a mix of ideas collected over the last few years.  The engine manages a set of FIFO //queues//.  //Messages// flow through one or more queues in a directed network of any complexity.  Everything is a queue so the whole network is asynchronous.  The calling application (that is, the product into which we embed the Xump engine) constructs this network dynamically at runtime, though the network may also be persistent.  The lifecycle of all resources is visible to, and managed by, the calling application.
+
+Queues pull messages from other queues via //selectors//, which specify static //matching// and //filtering// operations. Selectors are like stored search criteria that act on the head of the queue, eating up or otherwise operating on messages.  A selector reads from one queue, and writes to another queue or set of queues.  Matching is a O(logn) set operation, in which Xump compares a message address to the set of selectors that read on a queue.  Filtering is a O(n2) operation in which Xump compares one message to one selector.  In theory we match first, and filter second.
+
+Selector match and filter operations are: Move, Copy, and Delete.  These work as you would expect.   Here is how two applications divide the flow of messages on a queue (the Wolfpack pattern for workload distribution):
+
+[[code]]
+Queue1
+    -> Selector MOVE
+        -> Queue2
+    -> Selector MOVE
+        -> Queue3
+[[/code]]
+
+Here is how two applications each get the full flow of messages (the Parrot pattern for information distribution):
+
+[[code]]
+Queue1
+    -> Selector COPY
+        -> Queue2
+    -> Selector COPY
+        -> Queue3
+[[/code]]
+
+A mix of selector operations is valid.  Here is how two applications divide the work on a queue, while a third gets a copy of every message:
 
 [[code]]
 Queue
-    -> Selector
-        -> Recipient
-[[/code]]
-
-If two or more applications share a queue, the flow of messages depends on the transformation.  Here is how two applications divide the flow of messages on a queue:
-
-[[code]]
-Queue
-    -> Selector MOVE
-        -> Recipient
-    -> Selector MOVE
-        -> Recipient
-[[/code]]
-
-Here is how two applications each get the full flow of messages:
-
-[[code]]
-Queue
-    -> Selector COPY
-        -> Recipient
-    -> Selector COPY
-        -> Recipient
-[[/code]]
-
-A mix of selector transformations is valid.  Here is how two applications divide the work on a queue, while a third gets a copy of every message:
-
-[[code]]
-Queue
     -> Selector MOVE
         -> Recipient
     -> Selector MOVE
@@ -69,134 +220,18 @@ Queue
         -> Recipient
 [[/code]]
 
-++ Persistence
+The implementation of selectors is extensible, via a virtual class interface, and the intention is that message processing applications that use Xump would provide their own implementations for the xump_select class.
 
-Persistence is defined at the queue level.  Any queue can be persistent, if the calling application provides the necessary support.  Message and queue persistence is independent, so that a single message can be held in multiple persistent queues, without creating duplicate work.  The persistent queues hold references to the message, rather than copies of it.
+To read messages off a queue, applications (that is, messaging servers which use Xump as their embedded engine) open and close "cursors" on queues.  Xump cursors are analogous to the SQL cursor concept.  The main difference is that when a cursor is open, messages are sent asynchronously to the application.
 
-This is a classic persistent shared queue:
+Applications use Xump by:
 
-[[code]]
-Queue with persistence
-    -> Selector MOVE
-        -> Recipient
-    -> Selector MOVE
-        -> Recipient
-[[/code]]
+* Constructing a directed network of queues and selectors;
+* Setting up cursors.
+* Publishing messages to queues.
+* Delivering messages received from cursors.
 
-Here is a fanout queue with independent persistence for one of the recipients:
+The persistence layer is extensible, via a virtual class interface, with the intention being that applications which embed Xump would provide their own storage layer implementations.  Persistence happens at the queue level, so it is possible to e.g. provide persistent subscriptions for some clients, and transient ones for others.
 
-[[code]]
-Queue
-    -> Selector COPY
-        -> Recipient
-    -> Selector COPY
-            -> Queue with persistence
-                -> Selector MOVE
-                    -> Recipient
-[[/code]]
-
-++ Delivery semantics
-
-The selector "copy" and "move" transformations deliver the message to the recipient if no target queue is specified.  The copy transformation is a pure streaming operation with no confirmation from the receipient.  The move transformation can be streamed or confirmed.  In the latter case, each message is confirmed by the recipient, and the selector is inactive until that confirmation is received.  Unconfirmed messages are pushed back onto the queue if the recipient disappears.
-
-++ Scenarios
-
-Here is the Housecat pattern for a recipient called "cat":
-
-[[code]]
-Sender
-    -> Queue
-        -> Selector address EQ "cat" COPY
-            -> Recipient
-[[/code]]
-
-Where a generous selector specifies a literal match on the message address.  Alternatively, messages for a specific recipient can be held on a queue which allows persistence to be added:
-
-[[code]]
-Sender
-    -> Queue
-        -> Selector address EQ "cat" COPY
-            -> Queue
-                -> Selector MOVE
-                    -> Recipient
-[[/code]]
-
-Multiple selectors can operate on the same queue with independent downstream processing:
-
-[[code]]
-Sender
-    -> Queue
-        -> Selector address EQ "cat" COPY
-            -> Recipient
-        -> Selector address EQ "cat" COPY
-            -> Queue
-                -> Selector MOVE
-                    -> Recipient
-        -> Selector address EQ "dog" COPY
-            -> Recipient
-[[/code]]
-
-Here is the Parrot pattern for a set of recipients:
-
-[[code]]
-Sender
-    -> Queue
-        -> Selector address like "rec.pets.*" COPY
-            -> Recipient
-        -> Selector address like "rec.pets.dogs" COPY
-            -> Queue
-                -> Selector MOVE
-                    -> Recipient
-        -> Selector address like "rec.pets.cats" COPY
-            -> Recipient
-[[/code]]
-
-Here is the Wolfpack pattern for a set of recipients:
-
-[[code]]
-Sender
-    -> Queue
-        -> Selector address EQ "wolf" COPY
-            -> Queue
-                -> Selector MOVE
-                    -> Recipient
-                -> Selector MOVE
-                    -> Recipient
-                -> Selector MOVE
-                    -> Recipient
-[[/code]]
-
-++ Control API
-
-Object properties are represented as structures.  Structures are allocated and destroyed using:
-
-* ref = objclass_new ();
-* objclass_destroy (&ref);
-
-Objects are referred to by a numeric identifier and accessed via CRUD interface:
-
-* id = objclass_create (ref);           #   Create object as specified
-* objclass_retrieve (id, ref);
-* objclass_update (id, ref);
-* objclass_delete (id);
-
-struct xpmi_queue_t
-
-queue = xump_queue_new ();
-xump_queue_create (queue,
-
-
-
-
-* id = objclass.Create (name, type, object)
-* objclass.Delete (id)
-* objclass.Retrieve (id, object)
-* objclass.Update (id, object)
-
-objclasses:
-
-* Queue
-* Selector
-
-++ Semantic API
+Delivery semantics (e.g. message acknowledgement) affect selectors insofar as selectors may want acknowledgment for their operations, and effectively block until they get it.  This would cause the queue to build up, typical for Wolfpack.  Without this, typical for Parrot, queues will process messages at full speed and mainly remain empty (unless sheer processing costs caused backlogs).
 
