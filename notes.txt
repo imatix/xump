@@ -4,8 +4,56 @@ Notes, in reverse chronological order.
 
 ++ 2009-06-02
 
-A portal can do about 130M requests per second, on one 3GHz core.  So, about
++++ Commit 7e30756: Constructing the portal queue API.
 
+To make it simple, the engine has a single store instance which is just the 'store' property.  This is not a full design.  We'd want to make at least one store instance per backend, but in fact allow the caller to create an arbitrary number of store instances, referenced by name.  We'll add that later.
+
+How this works now - this is from the xump.icl selftest method:
+
+[[code]]
+    //  Create an engine instance
+    xump_t
+        *xump;
+    xump = xump_new ();
+
+    //  Create a queue object within single store
+    xump_queue_t
+        *queue;
+    queue = xump_queue_new (xump_store (xump), "Test queue");
+
+    //  Check that every methods fails properly
+    assert (xump_queue_create (queue) == -1);
+    assert (xump_queue_fetch (queue) == -1);
+    assert (xump_queue_update (queue) == -1);
+    assert (xump_queue_delete (queue) == -1);
+
+    //  Destroy queue object and engine instance
+    xump_queue_destroy (&queue);
+    xump_destroy (&xump);
+[[/code]]
+
+Running the create method a billion times takes around 7.5 seconds on a 3GHz core.  So, about 130M requests/second, 7.5 nanoseconds per request.  No bottleneck here, yet, synchronous portals are fast.
+
++++ Commit 5f06b01: Engine now supports multiple store registration/lookup
+
+Added two methods to the engine, which let the caller register and lookup stores.  It's more sensible that the caller creates the store portal, since it knows what extensions it is using.  The API for creating and registering a new store is short and sweet:
+
+[[code]]
+xump_register_store (xump, xump_store_ram__xump_store_new (NULL, storenamegoeshere));
+[[/code]]
+
+I called the methods 'register_store' and 'lookup_store' because the object_verb form I'd usually prefer ('store_register' and 'store_lookup') suggest that these methods are in the store class, which they are not.
+
++++ Commit 9f9a1c2: Improved engine store method names
+
+Actually, on second thoughts, it's even nicer to make the store list look like a property of engine, and use the same style as we use for opaque object properties, namely "set_property" and "property".  This gives us a readable:
+
+[[code]]
+xump_set_store (xump, xump_store_ram__xump_store_new (NULL, "RAM1"));
+xump_set_store (xump, xump_store_ram__xump_store_new (NULL, "RAM2"));
+assert (xump_store (xump, "RAM1") != NULL);
+assert (xump_store (xump, "RAM0") == NULL);
+[[/code]]
 
 ++ 2009-06-02
 
@@ -235,4 +283,3 @@ Applications use Xump by:
 The persistence layer is extensible, via a virtual class interface, with the intention being that applications which embed Xump would provide their own storage layer implementations.  Persistence happens at the queue level, so it is possible to e.g. provide persistent subscriptions for some clients, and transient ones for others.
 
 Delivery semantics (e.g. message acknowledgement) affect selectors insofar as selectors may want acknowledgment for their operations, and effectively block until they get it.  This would cause the queue to build up, typical for Wolfpack.  Without this, typical for Parrot, queues will process messages at full speed and mainly remain empty (unless sheer processing costs caused backlogs).
-
