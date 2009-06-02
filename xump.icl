@@ -49,7 +49,7 @@ of this class.
 <method name = "destroy">
 </method>
 
-<method name = "register store" template = "function">
+<method name = "set store" template = "function">
     <doc>
     Registers a store instance with the engine.  The caller is responsible
     for creating the store using a xump_store_xyz_xump_store_new () method.
@@ -63,7 +63,7 @@ of this class.
     xump_store_unlink (&store);
 </method>
 
-<method name = "lookup store" return = "store">
+<method name = "store" return = "store">
     <doc>
     Returns the named store instance, or NULL if no such store was registered.
     </doc>
@@ -96,13 +96,13 @@ of this class.
     </local>
     //
     xump = xump_new ();
-    xump_register_store (xump, xump_store_ram__xump_store_new (NULL, "RAM1"));
-    xump_register_store (xump, xump_store_ram__xump_store_new (NULL, "RAM2"));
+    xump_set_store (xump, xump_store_ram__xump_store_new (NULL, "RAM1"));
+    xump_set_store (xump, xump_store_ram__xump_store_new (NULL, "RAM2"));
 
-    assert (xump_lookup_store (xump, "RAM1") != NULL);
-    assert (xump_lookup_store (xump, "RAM0") == NULL);
+    assert (xump_store (xump, "RAM1") != NULL);
+    assert (xump_store (xump, "RAM0") == NULL);
 
-    store = xump_lookup_store (xump, "RAM1");
+    store = xump_store (xump, "RAM1");
     queue = xump_queue_new (store, "Test queue");
 
     //  Check that every methods fails properly
