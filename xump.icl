@@ -37,56 +37,81 @@ of this class.
 <import class = "xump_queue" />
 
 <context>
-    <property name = "store" type = "xump_store_t *" readonly = "1" />
 </context>
 
 <method name = "new">
     <doc>
     Creates a new Xump engine instance.  Xump engines are unnamed containers
-    for stores.  For now we create one store instance.
+    for stores.
     </doc>
-    <local>
-    </local>
-    //
-    //  Register RAM storage back-end
-    self->store = xump_store_ram__xump_store_new (NULL, "RAM");
-    xump__xump_store_bind (self, self->store);
-    xump_store_request_announce (self->store);
 </method>
 
 <method name = "destroy">
-    xump_store_unlink (&self->store);
+</method>
+
+<method name = "register store" template = "function">
+    <doc>
+    Registers a store instance with the engine.  The caller is responsible
+    for creating the store using a xump_store_xyz_xump_store_new () method.
+    The engine will automatically destroy the store instance at shutdown
+    time.
+    </doc>
+    <argument name = "store" type = "xump_store_t *" />
+    //
+    xump__xump_store_bind (self, store);
+    xump_store_request_announce (store);
+    xump_store_unlink (&store);
+</method>
+
+<method name = "lookup store" return = "store">
+    <doc>
+    Returns the named store instance, or NULL if no such store was registered.
+    </doc>
+    <argument name = "self" type = "$(selftype) *">Reference to self</argument>
+    <argument name = "name" type = "char *" />
+    <declare name = "store" type = "xump_store_t *" default = "NULL" />
+    <local>
+    ipr_looseref_t
+        *looseref;                      //  Store portals are in looseref list
+    </local>
+    //
+    looseref = ipr_looseref_list_first (self->xump_store_list);
+    while (looseref) {
+        store = (xump_store_t *) (looseref->object);
+        if (streq (store->name, name))
+            break;                      //  We've found the matching store
+        store = NULL;
+        looseref = ipr_looseref_list_next (&looseref);
+    }
 </method>
 
 <method name = "selftest">
     <local>
     xump_t
         *xump;
+    xump_store_t
+        *store;
     xump_queue_t
         *queue;
-    int
-        rc;
-    int count1, count2;
     </local>
     //
     xump = xump_new ();
+    xump_register_store (xump, xump_store_ram__xump_store_new (NULL, "RAM1"));
+    xump_register_store (xump, xump_store_ram__xump_store_new (NULL, "RAM2"));
 
-    queue = xump_queue_new (xump_store (xump), "Test queue");
+    assert (xump_lookup_store (xump, "RAM1") != NULL);
+    assert (xump_lookup_store (xump, "RAM0") == NULL);
 
-    for (count1 = 0; count1 < 1000000; count1++) {
-        for (count2 = 0; count2 < 1000; count2++) {
-            rc = xump_queue_create (queue);
-        }
-    }
-    assert (rc == -1);
-    rc = xump_queue_fetch (queue);
-    assert (rc == -1);
-    rc = xump_queue_update (queue);
-    assert (rc == -1);
-    rc = xump_queue_delete (queue);
-    assert (rc == -1);
+    store = xump_lookup_store (xump, "RAM1");
+    queue = xump_queue_new (store, "Test queue");
+
+    //  Check that every methods fails properly
+    assert (xump_queue_create (queue) == -1);
+    assert (xump_queue_fetch  (queue) == -1);
+    assert (xump_queue_update (queue) == -1);
+    assert (xump_queue_delete (queue) == -1);
+
     xump_queue_destroy (&queue);
-
     xump_destroy (&xump);
 </method>
 
