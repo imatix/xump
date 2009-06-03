@@ -31,11 +31,14 @@ of this class.
 
 <inherit class = "xump_store_front" />
 
+<!-- We import all project classes, so xump.h acts as the library header -->
 <import class = "asl" />
 <import class = "xump_store" />
+<import class = "xump_queue" />
+<import class = "xump_message" />
 <import class = "xump_store_ram" />
 <import class = "xump_store_ram_queue" />
-<import class = "xump_queue" />
+<import class = "xump_store_ram_message" />
 
 <context>
 </context>
@@ -93,7 +96,9 @@ of this class.
     xump_store_t
         *store;
     xump_queue_t
-        *queue = NULL;
+        *queue;
+    xump_message_t
+        *message;
     icl_shortstr_t
         queue_name;
     </local>
@@ -131,12 +136,12 @@ of this class.
     queue = xump_queue_fetch (store, queue_name);
     assert (queue == NULL);
 
-    //  Create some queues, should be freed when we exit
+    //  Create a queue and post messages to it
     queue = xump_queue_create (store, NULL);
-    xump_queue_unlink (&queue);
-    queue = xump_queue_create (store, NULL);
-    xump_queue_unlink (&queue);
-    queue = xump_queue_create (store, NULL);
+    message = xump_message_post (queue, "address1", "abc", 4);
+    xump_message_unlink (&message);
+    message = xump_message_post (queue, "address2", "def", 4);
+    xump_message_unlink (&message);
     xump_queue_unlink (&queue);
 
     xump_destroy (&xump);

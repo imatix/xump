@@ -33,7 +33,6 @@ a name, and a list of messages.
     <option name = "alloc"  value = "cache" />
 </inherit>
 
-<import class = "asl" />
 <import class = "xump" />
 
 <context>
@@ -43,27 +42,36 @@ a name, and a list of messages.
 </context>
 
 <method name = "new">
-    <argument name = "name" type = "char *" />
+    <argument name = "queue" type = "xump_queue_t *" />
     //
-    icl_console_print ("I: creating RAM queue '%s'", name);
     self->messages = ipr_looseref_list_new ();
-    self_set_name (self, name);
+    self->name = icl_mem_strdup (xump_queue_name (queue));
+    icl_console_print ("I: creating RAM queue '%s'", self->name);
 </method>
 
 <method name = "destroy">
-    //while ((message = (xump_message_t *) ipr_looseref_pop (self->messages)))
-    //  xump_message_destroy (&message);
+    <local>
+    xump_store_ram_message_t
+        *message;
+    </local>
+    //
+    while ((message = (xump_store_ram_message_t *) ipr_looseref_pop (self->messages)))
+        xump_store_ram_message_destroy (&message);
+
     icl_console_print ("I: deleting RAM queue '%s'", self->name);
     ipr_looseref_list_destroy (&self->messages);
     icl_mem_free (self->name);
 </method>
 
-<method name = "selftest">
-    xump_store_ram_queue_t
-        *queue;
-
-    queue = xump_store_ram_queue_new ("queue 1");
-    xump_store_ram_queue_destroy (&queue);
+<method name = "accept" template = "function">
+    <doc>
+    Attaches a message to the tail of the queue.
+    </doc>
+    <argument name = "message" type = "xump_store_ram_message_t *" />
+    //
+    ipr_looseref_queue (self->messages, message);
 </method>
+
+<method name = "selftest" />
 
 </class>

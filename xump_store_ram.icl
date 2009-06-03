@@ -71,7 +71,7 @@ xump_store_ram_messg.icl class.
     //  Now either create or fetch queue
     ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
     if (ram_queue == NULL) {
-        ram_queue = xump_store_ram_queue_new (xump_queue_name (queue));
+        ram_queue = xump_store_ram_queue_new (queue);
         ipr_hash_insert (self->queues, xump_queue_name (queue), ram_queue);
     }
     xump_queue_set_name (queue, xump_store_ram_queue_name (ram_queue));
@@ -101,6 +101,25 @@ xump_store_ram_messg.icl class.
         xump_store_ram_queue_destroy (&ram_queue);
         ipr_hash_delete (self->queues, xump_queue_name (queue));
     }
+</method>
+
+<method name = "queue post">
+    <local>
+    xump_store_ram_queue_t
+        *ram_queue;
+    xump_store_ram_message_t
+        *ram_message;
+    </local>
+    //
+    assert (queue);
+    assert (message);
+    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
+    if (ram_queue) {
+        ram_message = xump_store_ram_message_new (message);
+        xump_store_ram_queue_accept (ram_queue, ram_message);
+    }
+    else
+        rc = -1;                        //  Error - no such queue
 </method>
 
 <private name = "header">

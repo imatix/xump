@@ -33,7 +33,6 @@
     <option name = "back_end" value = "sync" />
 </inherit>
 
-<import class = "asl" />
 <import class = "xump" />
 
 <context>
@@ -44,13 +43,15 @@
 <data>
     <request name = "announce" />
 
+    <!-- Queues -->
+
     <request name = "queue create">
         <doc>
         Creates a new queue in the store.  If the name is null, generates a
         queue name.  The queue may already exist. Returns 0 if OK, -1 if the
         request failed.
         </doc>
-        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+        <field name = "queue" type = "xump_queue_t *" />
     </request>
 
     <request name = "queue fetch">
@@ -58,7 +59,7 @@
         Fetches a queue from the store, by name. The queue must exist.
         Returns 0 if OK, -1 if the request failed.
         </doc>
-        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+        <field name = "queue" type = "xump_queue_t *" />
     </request>
 
     <request name = "queue delete">
@@ -67,7 +68,15 @@
         or created the queue. Returns 0 if OK, -1 if the request failed.  The
         queue does not need to exist - delete is idempotent.
         </doc>
-        <field name = "queue" type = "xump_queue_t *">Queue object</field>
+        <field name = "queue" type = "xump_queue_t *" />
+    </request>
+
+    <request name = "queue post">
+        <doc>
+        Posts a message to the tail of the queue.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *" />
+        <field name = "message" type = "xump_message_t *" />
     </request>
 </data>
 

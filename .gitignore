@@ -21,18 +21,30 @@ xump_store_ram_queue_test_test.c
 xump_store_ram_queue.h
 xump_store_ram_queue.c
 xump_store_ram_queue.c.o
-xump_test.c
-xump_test_test.c.o
-xump_test_test.c
-xump.h
-xump.c
-xump.c.o
+xump_store_ram_message_test.c
+xump_store_ram_message_test_test.c.o
+xump_store_ram_message_test_test.c
+xump_store_ram_message.h
+xump_store_ram_message.c
+xump_store_ram_message.c.o
 xump_queue_test.c
 xump_queue_test_test.c.o
 xump_queue_test_test.c
 xump_queue.h
 xump_queue.c
 xump_queue.c.o
+xump_message_test.c
+xump_message_test_test.c.o
+xump_message_test_test.c
+xump_message.h
+xump_message.c
+xump_message.c.o
+xump_test.c
+xump_test_test.c.o
+xump_test_test.c
+xump.h
+xump.c
+xump.c.o
 xump_config.icl
 xump_config_test.c
 xump_config_test_test.c.o
@@ -57,12 +69,18 @@ xump_store_ram.o
 xump_store_ram_queue_test.o
 xump_store_ram_queue_test
 xump_store_ram_queue.o
-xump_test.o
-xump_test
-xump.o
+xump_store_ram_message_test.o
+xump_store_ram_message_test
+xump_store_ram_message.o
 xump_queue_test.o
 xump_queue_test
 xump_queue.o
+xump_message_test.o
+xump_message_test
+xump_message.o
+xump_test.o
+xump_test
+xump.o
 xump_config_test.o
 xump_config_test
 xump_config.o
@@ -82,6 +100,7 @@ Makefile
 
 #  Other stuff we get lying around
 core
+scrap
 icl_mem_fat.xml
 panic.log
 

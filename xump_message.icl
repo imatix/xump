@@ -25,165 +25,66 @@
     opaque    = "1"
     >
 <doc>
-The xump_message class holds contents and property fields.
-The current implementation stores messages in memory only.
-Messages are either physical (they have data) or virtual
-(they refer to a physical message).  Applications work with
-virtual messages only.  This class creates and destroys the
-physical messages automatically, behind the scenes.
+The xump_message class references a message resource held in a storage layer.
+This class implements the create/fetch/delete access methods on the message.
 </doc>
 
 <inherit class = "icl_object">
-    <option name = "alloc"  value = "cache" />
-    <option name = "links"  value = "1" />
-    <option name = "rwlock" value = "1" />
+    <option name = "alloc" value = "cache" />
+    <option name = "links" value = "1" />
 </inherit>
 
-<import class = "asl" />
-
-<private name = "header">
-#define XUMP_MESSAGE_PHYSICAL   (void *) (-1)
-</private>
+<import class = "xump" />
 
 <context>
-    address
-    body
-    size
-    fields
-
-Every single message has an address, which is used heavily, so we will make this a dedicated property of the class.  A message also has content body, content length, and a table of name/value fields.
-
-
-    //  Context for a physical message
-    ipr_dict_table_t
-        *fields;                        //  Envelope field table
-    ipr_looseref_list_t
-        *contents;                      //  List of typed contents
-
-    //  Context for a virtual message
-    xump_message_t
-        *physical;                      //  Physical message
+    <property name = "store" type = "xump_store_t *" readonly = "1" />
+    <property name = "queue" type = "xump_queue_t *" readonly = "1" />
+    <property name = "address"   type = "char *" readonly = "1" />
+    <property name = "body data" type = "void *" readonly = "1" />
+    <property name = "body size" type = "size_t" readonly = "1" />
 </context>
 
-<method name = "new">
+<method name = "new" private = "1">
+    <argument name = "queue" type = "xump_queue_t *">Enclosing queue</argument>
+    <argument name = "address" type = "char *">Address, if any</argument>
+    <argument name = "body data" type = "void *">Body data if any</argument>
+    <argument name = "body size" type = "size_t">Size of body</argument>
+    //
+    self->store = xump_store_link (xump_queue_store (queue));
+    self->queue = xump_queue_link (queue);
+    self->address = icl_mem_strdup (address);
+    if (body_size) {
+        assert (body_data);
+        self->body_data = icl_mem_alloc (body_size);
+        self->body_size = body_size;
+        memcpy (self->body_data, body_data, body_size);
+    }
+</method>
+
+<method name = "destroy" private = "1">
+    xump_queue_unlink (&self->queue);
+    xump_store_unlink (&self->store);
+    icl_mem_free (self->address);
+    icl_mem_free (self->body_data);
+</method>
+
+<method name = "post" return = "self">
     <doc>
-    Creates a new virtual message.  If the message argument is null,
-    implicitly creates a new physical message as well.  If the message
-    argument is not null, the new virtual message links to the same
-    physical message as the specified one.
-    For internal use: pass XUMP_MESSAGE_PHYSICAL to create a new
-    physical message.
+    This public method posts a new message to the end of the queue.  It acts
+    as a constructor and returns a new message object when successful.  The
+    caller must unlink this message object when finished using it.
     </doc>
-    <argument name = "message" type = "xump_message_t *">Message to clone</argument>
+    <argument name = "queue" type = "xump_queue_t *">Enclosing queue</argument>
+    <argument name = "address" type = "char *">Message address, if any</argument>
+    <argument name = "body data" type = "void *">Body data if any</argument>
+    <argument name = "body size" type = "size_t">Size of body</argument>
+    <declare name = "self" type = "$(selftype) *" />
     //
-    if (message == XUMP_MESSAGE_PHYSICAL)
-        ;                               //  Create physical message
-    else
-    if (message) {
-        assert (message->physical);
-        self->physical = xump_message_link (message->physical);
-    }
-    else
-        self->physical = xump_message_new (XUMP_MESSAGE_PHYSICAL);
+    self = self_new (queue, address, body_data, body_size);
+    if (self)
+        xump_store_request_queue_post (self->store, queue, self);
 </method>
 
-<method name = "destroy">
-    //  Destroy context for physical message
-    ipr_dict_table_destroy (&self->fields);
-
-    //  Destroy context for virtual message
-    xump_message_unlink (&self->physical);
-</method>
-
-<method name = "field set" template = "function">
-    <doc>
-    Sets an envelope field value.  Accepts a printf-style format specifier
-    with a variable argument list.  The formatted string is restricted to
-    some arbitrary value.  All user supplied strings should be provided as
-    arguments, not as format.
-    </doc>
-    <argument name = "name" type = "char *">Field name</argument>
-    <argument name = "format" type = "char *">Format specifier</argument>
-    <argument name = "args" type = "...">Variable arguments</argument>
-    <local>
-    icl_shortstr_t
-        value;
-    </local>
-    //
-    //  If virtual message, resolve format string and pass on to
-    //  physical message.  If physical message, store into table.
-    if (self->physical) {
-        apr_vsnprintf (value, ICL_SHORTSTR_MAX, format, args);
-        self_field_set (self->physical, name, value);
-    }
-    else {
-        if (self->fields == NULL)
-            self->fields = ipr_dict_table_new ();
-        ipr_dict_assume (self->fields, name, format);
-    }
-</method>
-
-<method name = "field get" return = "value">
-    <doc>
-    Retrieves an envelope field and returns its string value.  Returns
-    "" if the field was not set.  Field names are case-sensitive.
-    The value is copied into a new memory buffer that the caller must
-    free when the value is no longer needed.
-    </doc>
-    <argument name = "self" type = "$(selftype) *">Self</argument>
-    <argument name = "name" type = "char *">Field name</argument>
-    <declare name = "value" type = "char *" />
-    <local>
-    ipr_dict_t
-        *item;
-    </local>
-    //
-    //  The fields table is created opportunistically, so may be null
-    //  If virtual message, pass on to physical message.  If physical
-    //  message, get from table.
-    if (self->physical)
-        value = self_field_get (self->physical, name);
-    else {
-        value = "";
-        if (self->fields) {
-            item = ipr_dict_table_search (self->fields, name);
-            if (item)
-                value = item->value;
-        }
-        value = icl_mem_strdup (value);
-    }
-</method>
-
-<method name = "selftest">
-    <local>
-    xump_message_t
-        *message1,
-        *message2;
-    char
-        *value;
-    </local>
-    //
-    //  Create two virtual messages that map to the same physical message
-    message1 = xump_message_new (NULL);
-    message2 = xump_message_new (message1);
-
-    //  Check that an undefined property is empty
-    value = xump_message_field_get (message1, "code");
-    assert (streq (value, ""));
-    icl_mem_free (value);
-
-    //  Check that a property set in one virtual message show in the other
-    xump_message_field_set (message1, "code", "1234");
-    value = xump_message_field_get (message1, "code");
-    assert (streq (value, "1234"));
-    icl_mem_free (value);
-    value = xump_message_field_get (message2, "code");
-    assert (streq (value, "1234"));
-    icl_mem_free (value);
-
-    //  Destroy the two virtual messages, the physical one should also go
-    xump_message_destroy (&message1);
-    xump_message_destroy (&message2);
-</method>
+<method name = "selftest" />
 
 </class>

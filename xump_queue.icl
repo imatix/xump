@@ -26,8 +26,7 @@
     >
 <doc>
 The xump_queue class references a queue resource held in a storage layer.
-This class implements the create/fetch/update/delete access methods on
-the queue.
+This class implements the create/fetch/delete access methods on the queue.
 </doc>
 
 <inherit class = "icl_object">
@@ -35,12 +34,10 @@ the queue.
     <option name = "links" value = "1" />
 </inherit>
 
-<import class = "asl" />
 <import class = "xump" />
 
 <context>
-    xump_store_t
-        *store;
+    <property name = "store" type = "xump_store_t *" readonly = "1" />
     <property name = "name" type = "char *" />
 </context>
 
@@ -49,7 +46,7 @@ the queue.
     <argument name = "name" type = "char *">Queue name, if any</argument>
     //
     self->store = xump_store_link (store);
-    xump_queue_set_name (self, name);
+    self->name = icl_mem_strdup (name);
 </method>
 
 <method name = "destroy" private = "1">
@@ -61,7 +58,7 @@ the queue.
     <doc>
     This public method creates or fetches a queue in the store.  It acts
     as a constructor and returns a new queue object when successful.  The
-    caller must unlink this object when finished using it.
+    caller must unlink this queue object when finished using it.
     </doc>
     <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
     <argument name = "name" type = "char *">Queue name, if any</argument>
@@ -69,14 +66,14 @@ the queue.
     //
     self = self_new (store, name);
     if (self)
-        xump_store_request_queue_create (store, self);
+        xump_store_request_queue_create (self->store, self);
 </method>
 
 <method name = "fetch" return = "self">
     <doc>
     This public method fetches a queue in the store.  It acts as a
     constructor and returns a new queue object when successful.  The
-    caller must unlink this object when finished using it.
+    caller must unlink this queue object when finished using it.
     </doc>
     <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
     <argument name = "name" type = "char *">Queue name, if any</argument>
@@ -84,7 +81,7 @@ the queue.
     //
     self = self_new (store, name);
     if (self) {
-        if (xump_store_request_queue_fetch (store, self))
+        if (xump_store_request_queue_fetch (self->store, self))
             self_destroy (&self);       //  No such queue, return NULL
     }
 </method>
