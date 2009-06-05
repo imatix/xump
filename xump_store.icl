@@ -43,8 +43,6 @@
 <data>
     <request name = "announce" />
 
-    <!-- Queues -->
-
     <request name = "queue create">
         <doc>
         Creates a new queue in the store.  If the name is null, generates a
@@ -64,7 +62,7 @@
 
     <request name = "queue delete">
         <doc>
-        Deletes a queue in the store.  The caller must previous have fetched
+        Deletes a queue in the store.  The caller must already have fetched
         or created the queue. Returns 0 if OK, -1 if the request failed.  The
         queue does not need to exist - delete is idempotent.
         </doc>

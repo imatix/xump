@@ -2,6 +2,20 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-04
+
+The storage layer must be entirely ignorant of how messages flow into queues, and out again.  This is handled by the engine.  What the storage layer does is store messages, provide access to them, and delete them.  In our current design, the head of the queue is stable insofar as the only party removing messages is the engine itself.
+
+Access to messages is thus synchronous, i.e. the engine polls the storage layer when it needs messages.  This means that we can browse queues using an index that iterates from the head of the queue, i.e. 0 = oldest message, 1 = second oldest, etc.  We need methods like this:
+
+* message_fetch (message, index) - fetch message object by index
+* message_update (message) - update message from object
+* message_delete (message) - delete message
+
+Which are the same as we previously sketched, only the message_create method having been changed into queue_post.
+
+Perhaps the best identifier for a message is a queue-unique id, rather than the index.  Thus the engine can manipulate messages independently.  In storage layers where the real message is large (e.g. a disk file), the message object acts as a reference.  In storage layers where the real message is small, the message object would hold the denormalized body data.
+
 ++ 2009-06-03
 
 +++ Commit 231aeeb: Making the queue API work nicely
@@ -63,9 +77,11 @@ xump_queue_unlink (&queue);
 
 The store_ram implementation is pretty trivial, it'll be more fun making a file system storage layer.  Several ways of doing this:
 
-* One file per queue, with one message per line.  For text messages.
-* One directory per queue, with one message per file.  For large messages.
-* One file per store, with queues and messages indexed into the file.  For mixed use.
+* One file per queue, with one message per line.  For text messages, especially if messages are never deleted.
+* One directory per queue, with one message per file.  For large messages, especially for file-transfer type work.  Meta data can be in separate files.
+* One file per store, with queues and messages indexed into the file.  Easy management of stores, and very fast if the indexes are properly designed.
+
+Using a database like SQLite would also be fun: one table per queue, one row per message.  This would probably be 10x slower than using a custom indexed file.
 
 ++ 2009-06-02
 
