@@ -103,7 +103,7 @@ xump_store_ram_messg.icl class.
     }
 </method>
 
-<method name = "queue post">
+<method name = "message create">
     <local>
     xump_store_ram_queue_t
         *ram_queue;
@@ -120,6 +120,15 @@ xump_store_ram_messg.icl class.
     }
     else
         rc = -1;                        //  Error - no such queue
+</method>
+
+<method name = "message fetch">
+</method>
+
+<method name = "message update">
+</method>
+
+<method name = "message delete">
 </method>
 
 <private name = "header">

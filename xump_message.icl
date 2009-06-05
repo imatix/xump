@@ -68,9 +68,9 @@ This class implements the create/fetch/delete access methods on the message.
     icl_mem_free (self->body_data);
 </method>
 
-<method name = "post" return = "self">
+<method name = "create" return = "self">
     <doc>
-    This public method posts a new message to the end of the queue.  It acts
+    This public method adds a new message to the end of the queue.  It acts
     as a constructor and returns a new message object when successful.  The
     caller must unlink this message object when finished using it.
     </doc>
@@ -82,7 +82,47 @@ This class implements the create/fetch/delete access methods on the message.
     //
     self = self_new (queue, address, body_data, body_size);
     if (self)
-        xump_store_request_queue_post (self->store, queue, self);
+        xump_store_request_message_create (self->store, queue, self);
+</method>
+
+<method name = "fetch" return = "self">
+    <doc>
+    This public method fetches a message from a queue.  It acts as a
+    constructor and returns a new message object when successful.  The
+    caller must unlink this message object when finished using it.  The
+    index is 0 or higher, indicating an offset from the head of the queue.
+    </doc>
+    <argument name = "queue" type = "xump_queue_t *">Enclosing queue</argument>
+    <argument name = "index" type = "size_t">Message index</argument>
+    <declare name = "self" type = "$(selftype) *" />
+    //
+    self = self_new (queue, NULL, NULL, 0);
+    if (self) {
+        if (xump_store_request_message_fetch (self->store, queue, self, index))
+            self_destroy (&self);       //  No such message, return NULL
+    }
+</method>
+
+<method name = "update" template = "function">
+    <doc>
+    This public method updates a message with modified properties.
+    </doc>
+    //
+    rc = xump_store_request_message_update (self->store, self);
+</method>
+
+<method name = "delete">
+    <doc>
+    This public method deletes a message in the queue.  It acts as a
+    destructor and nullifies the provided message object reference.
+    The message object may already be destroyed.
+    </doc>
+    <argument name = "self_p" type = "$(selftype) **">Message object ref</argument>
+    assert (self_p);
+    if (*self_p) {
+        xump_store_request_message_delete ((*self_p)->store, *self_p);
+        self_unlink (self_p);
+    }
 </method>
 
 <method name = "selftest" />

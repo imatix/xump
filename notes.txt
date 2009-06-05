@@ -2,17 +2,28 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-05
+
+The API is breaking one of the rules of software design, it's confusing.  I find myself looking at the code to figure out where I put the message creation code.  This ain't good.  So, I'm going to change this again, so that we create messages like we do queues, with a 'message_create' method.  This is then a 'create' method on the xump_message class, which invokes the storage portal method 'message_create'.
+
+So what we have is:
+
+* xump_queue.icl: create, fetch, delete (no update possible on queues).
+* xump_message.icl: create, fetch, update, delete.
+* xump_store.icl: queue_create, queue_fetch, queue_delete, message_create, message_fetch, message_update, message_delete.
+
+Sorry for the detour.  Sometimes we need to try stuff in order to realize that it's silly.
+
+
 ++ 2009-06-04
 
 The storage layer must be entirely ignorant of how messages flow into queues, and out again.  This is handled by the engine.  What the storage layer does is store messages, provide access to them, and delete them.  In our current design, the head of the queue is stable insofar as the only party removing messages is the engine itself.
 
-Access to messages is thus synchronous, i.e. the engine polls the storage layer when it needs messages.  This means that we can browse queues using an index that iterates from the head of the queue, i.e. 0 = oldest message, 1 = second oldest, etc.  We need methods like this:
+Access to messages is thus synchronous, i.e. the engine polls the storage layer when it needs messages.  This means that we can browse queues using an index that iterates from the head of the queue, i.e. 0 = oldest message, 1 = second oldest, etc.  We need methods like this, as we previously sketched:
 
 * message_fetch (message, index) - fetch message object by index
 * message_update (message) - update message from object
 * message_delete (message) - delete message
-
-Which are the same as we previously sketched, only the message_create method having been changed into queue_post.
 
 Perhaps the best identifier for a message is a queue-unique id, rather than the index.  Thus the engine can manipulate messages independently.  In storage layers where the real message is large (e.g. a disk file), the message object acts as a reference.  In storage layers where the real message is small, the message object would hold the denormalized body data.
 

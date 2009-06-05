@@ -138,9 +138,9 @@ of this class.
 
     //  Create a queue and post messages to it
     queue = xump_queue_create (store, NULL);
-    message = xump_message_post (queue, "address1", "abc", 4);
+    message = xump_message_create (queue, "address1", "abc", 4);
     xump_message_unlink (&message);
-    message = xump_message_post (queue, "address2", "def", 4);
+    message = xump_message_create (queue, "address2", "def", 4);
     xump_message_unlink (&message);
     xump_queue_unlink (&queue);
 

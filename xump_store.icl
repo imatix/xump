@@ -69,13 +69,42 @@
         <field name = "queue" type = "xump_queue_t *" />
     </request>
 
-    <request name = "queue post">
+    <request name = "message create">
         <doc>
-        Posts a message to the tail of the queue.
+        Creates a new message in the queue.  Returns 0 if OK, -1 if the request
+        failed.
         </doc>
         <field name = "queue" type = "xump_queue_t *" />
         <field name = "message" type = "xump_message_t *" />
     </request>
+
+    <request name = "message fetch">
+        <doc>
+        Fetches a message from the queue.  Returns 0 if OK, -1 if the request
+        failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *" />
+        <field name = "message" type = "xump_message_t *" />
+        <field name = "index" type = "int" />
+    </request>
+
+    <request name = "message update">
+        <doc>
+        Updates a message's properties.  Returns 0 if OK, -1 if the request
+        failed.
+        </doc>
+        <field name = "message" type = "xump_message_t *" />
+    </request>
+
+    <request name = "message delete">
+        <doc>
+        Deletes a message from the queue.  The caller must already have
+        fetched or created the message.  Returns 0 if OK, -1 if the request
+        failed.  The message does not need to exist - delete is idempotent.
+        </doc>
+        <field name = "message" type = "xump_message_t *" />
+    </request>
+
 </data>
 
 <method name = "new">
