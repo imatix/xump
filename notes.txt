@@ -2,11 +2,17 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-08
+
+I'm removing the message_update method, it does not make sense.  We define a message fully when we create it, and all state needed to do routing should be held in the routing layer, not the storage layer.
+
+The message_delete method needs to be idempotent, thus safe to call no matter what the state of the store.  Thus, before we delete the ram message we need to check that the queue exists.  We should be robust against stupid things like fetching a message, deleting the queue, then trying to delete the message.  That means we do not need to worry about the order of a teardown.  The cost is an extra lookup, eventually this can be optimised away.
+
 ++ 2009-06-06
 
 We identify messages using a numeric ID that is unique within a queue.  It's the storage layer's responsibility to provide new IDs.  We'll use an unsigned 32-bit ID and ignore rollover.  If a single queue has more than 2^32 messages, the older ones won't be accessible.  Fair enough.
 
-Thinking: xump_message and xump_queue objects should have a void * block which is managed by the storage layer.  This requires that the constructors (at least) and destructors are called from within the storage layer.  We can constrain destruction of the void * block as icl_mem_free.
+Thinking: xump_message and xump_queue objects should have a void * context block which is managed by the storage layer.  This requires that the constructors (at least) and destructors are called from within the storage layer.  We can constrain destruction of the void * block as icl_mem_free.
 
 ++ 2009-06-05
 

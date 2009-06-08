@@ -162,12 +162,23 @@ xump_store_ram_messg.icl class.
     }
 </method>
 
-<method name = "message update">
-    rc = -1;
-</method>
-
 <method name = "message delete">
-    rc = -1;
+    <local>
+    xump_store_ram_queue_t
+        *ram_queue;
+    xump_store_ram_message_t
+        *ram_message;
+    </local>
+    //
+    assert (message);
+    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (xump_message_queue (message)));
+    if (ram_queue) {
+        xump_store_ram_queue_delete_message (ram_queue, xump_message_id (message));
+        icl_console_print ("I: deleting message '%s' (%d)",
+            xump_message_address (message), xump_message_id (message));
+    }
+    else
+        rc = -1;                        //  Error - no such queue
 </method>
 
 <private name = "header">

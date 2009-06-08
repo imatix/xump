@@ -132,6 +132,35 @@ a name, and a list of messages.
     }
 </method>
 
+<method name = "delete message" template = "function">
+    <doc>
+    Deletes the message specified by id.  Returns 0 if the message was
+    deleted, else returns -1.  This version does a simple scan of all the
+    list from the head.
+    </doc>
+    <argument name = "id" type = "size_t" />
+    <local>
+    ipr_looseref_t
+        *looseref;
+    </local>
+    //
+    rc = -1;                            //  Assume we don't find message
+    looseref = ipr_looseref_list_first (self->messages);
+    while (looseref) {
+        xump_store_ram_message_t
+            *message;
+        message = (xump_store_ram_message_t *) (looseref->object);
+        if (xump_store_ram_message_id (message) == id) {
+            ipr_looseref_destroy (&looseref);
+            xump_store_ram_message_destroy (&message);
+            rc = 0;                     //  Found, and deleted
+            break;
+        }
+        else
+            looseref = ipr_looseref_list_next (&looseref);
+    }
+</method>
+
 <method name = "selftest" />
 
 </class>

@@ -95,14 +95,6 @@
         <field name = "index"     type = "size_t" />
     </request>
 
-    <request name = "message update">
-        <doc>
-        Updates a message's properties.  Returns 0 if OK, -1 if the request
-        failed.
-        </doc>
-        <field name = "message" type = "xump_message_t *" />
-    </request>
-
     <request name = "message delete">
         <doc>
         Deletes a message from the queue.  The caller must already have

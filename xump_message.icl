@@ -43,6 +43,13 @@ This class implements the create/fetch/delete access methods on the message.
     <property name = "address"   type = "char *"         readonly = "1" />
     <property name = "body data" type = "void *"         readonly = "1" />
     <property name = "body size" type = "size_t"         readonly = "1" />
+    <property name = "context"   type = "void *">
+      Caller-defined context block, allocated by caller from heap
+      <put>
+        icl_mem_free (self->context);
+        self->context = context;
+      </put>
+    </property>
 </context>
 
 <method name = "new">
@@ -67,6 +74,7 @@ This class implements the create/fetch/delete access methods on the message.
     xump_store_unlink (&self->store);
     icl_mem_free (self->address);
     icl_mem_free (self->body_data);
+    icl_mem_free (self->context);
 </method>
 
 <method name = "create" return = "self">
@@ -98,14 +106,6 @@ This class implements the create/fetch/delete access methods on the message.
     //
     xump_store_request_message_fetch (xump_queue_store (queue),
         queue, &self, index);
-</method>
-
-<method name = "update" template = "function">
-    <doc>
-    This public method updates a message with modified properties.
-    </doc>
-    //
-    rc = xump_store_request_message_update (self->store, self);
 </method>
 
 <method name = "delete">

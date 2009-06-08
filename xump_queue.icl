@@ -41,6 +41,13 @@ This class implements the create/fetch/delete access methods on the queue.
         last_id;
     <property name = "store" type = "xump_store_t *" readonly = "1" />
     <property name = "name" type = "char *" />
+    <property name = "context"   type = "void *">
+      Caller-defined context block, allocated by caller from heap
+      <put>
+        icl_mem_free (self->context);
+        self->context = context;
+      </put>
+    </property>
 </context>
 
 <method name = "new">
@@ -54,6 +61,7 @@ This class implements the create/fetch/delete access methods on the queue.
 <method name = "destroy" private = "1">
     xump_store_unlink (&self->store);
     icl_mem_free (self->name);
+    icl_mem_free (self->context);
 </method>
 
 <method name = "create" return = "self">

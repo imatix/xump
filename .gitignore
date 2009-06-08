@@ -103,6 +103,7 @@ core
 scrap
 icl_mem_fat.xml
 panic.log
+*.lst
 
 #  End
 
