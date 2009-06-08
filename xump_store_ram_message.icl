@@ -36,21 +36,23 @@ A message has an address, body data, and body size.
 <import class = "xump" />
 
 <context>
+    <property name = "id"        type = "size_t" />
     <property name = "address"   type = "char *" readonly = "1" />
     <property name = "body data" type = "void *" readonly = "1" />
     <property name = "body size" type = "size_t" readonly = "1" />
 </context>
 
 <method name = "new">
-    <argument name = "message" type = "xump_message_t *" />
+    <argument name = "address" type = "char *">Message address, if any</argument>
+    <argument name = "body data" type = "void *">Body data if any</argument>
+    <argument name = "body size" type = "size_t">Size of body</argument>
     //
-    self->address = icl_mem_strdup (xump_message_address (message));
-    if (xump_message_body_size (message)) {
-        self->body_size = xump_message_body_size (message);
-        self->body_data = icl_mem_alloc (self->body_size);
-        memcpy (self->body_data, xump_message_body_data (message), self->body_size);
+    self->address = icl_mem_strdup (address);
+    if (body_size) {
+        self->body_size = body_size;
+        self->body_data = icl_mem_alloc (body_size);
+        memcpy (self->body_data, body_data, body_size);
     }
-    icl_console_print ("I: creating RAM message '%s'", self->address);
 </method>
 
 <method name = "destroy">

@@ -55,26 +55,28 @@ xump_store_ram_messg.icl class.
 <method name = "queue create">
     <local>
     icl_shortstr_t
-        name;
+        queue_name;
     xump_store_ram_queue_t
         *ram_queue;
     </local>
     //
-    assert (queue);
+    assert (queue_p);
     //  If queue is unnamed, invent a unique random name now
-    if (xump_queue_name (queue) == NULL) {
+    if (name)
+        icl_shortstr_cpy (queue_name, name);
+    else
         do {
-            ipr_str_random (name, "Q-AAAAAA");
-        } until (ipr_hash_lookup (self->queues, name) == NULL);
-        xump_queue_set_name (queue, name);
-    }
-    //  Now either create or fetch queue
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
+            ipr_str_random (queue_name, "Q-AAAAAA");
+        } until (ipr_hash_lookup (self->queues, queue_name) == NULL);
+
+    //  Either create or fetch RAM queue
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue == NULL) {
-        ram_queue = xump_store_ram_queue_new (queue);
-        ipr_hash_insert (self->queues, xump_queue_name (queue), ram_queue);
+        ram_queue = xump_store_ram_queue_new (queue_name);
+        ipr_hash_insert (self->queues, queue_name, ram_queue);
     }
-    xump_queue_set_name (queue, xump_store_ram_queue_name (ram_queue));
+    //  Create queue object for caller
+    *queue_p = xump_queue_new (portal, queue_name);
 </method>
 
 <method name = "queue fetch">
@@ -83,10 +85,14 @@ xump_store_ram_messg.icl class.
         *ram_queue;
     </local>
     //
-    assert (queue);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
-    if (!ram_queue)
+    assert (queue_p);
+    ram_queue = ipr_hash_lookup (self->queues, name);
+    if (ram_queue)
+        *queue_p = xump_queue_new (portal, name);
+    else {
+        *queue_p = NULL;
         rc = -1;
+    }
 </method>
 
 <method name = "queue delete">
@@ -112,23 +118,56 @@ xump_store_ram_messg.icl class.
     </local>
     //
     assert (queue);
-    assert (message);
+    assert (message_p);
     ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
     if (ram_queue) {
-        ram_message = xump_store_ram_message_new (message);
-        xump_store_ram_queue_accept (ram_queue, ram_message);
+        ram_message = xump_store_ram_message_new (address, body_data, body_size);
+        xump_store_ram_queue_put_message (ram_queue, ram_message);
+        *message_p = xump_message_new (queue, address, body_data, body_size);
+        xump_message_set_id (*message_p, xump_store_ram_message_id (ram_message));
+        icl_console_print ("I: creating message '%s' (%d)",
+            xump_message_address (*message_p), xump_message_id (*message_p));
     }
-    else
+    else {
+        *message_p = NULL;
         rc = -1;                        //  Error - no such queue
+    }
 </method>
 
 <method name = "message fetch">
+    <local>
+    xump_store_ram_queue_t
+        *ram_queue;
+    xump_store_ram_message_t
+        *ram_message;
+    </local>
+    //
+    assert (queue);
+    assert (message_p);
+    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
+    if (ram_queue
+    &&  xump_store_ram_queue_get_message (ram_queue, &ram_message, index) == 0) {
+        *message_p = xump_message_new (queue,
+            xump_store_ram_message_address   (ram_message),
+            xump_store_ram_message_body_data (ram_message),
+            xump_store_ram_message_body_size (ram_message));
+        xump_message_set_id (*message_p, xump_store_ram_message_id (ram_message));
+
+        icl_console_print ("I: fetching message '%s' (%d)",
+            xump_message_address (*message_p), xump_message_id (*message_p));
+    }
+    else {
+        *message_p = NULL;
+        rc = -1;                        //  Error - no such queue
+    }
 </method>
 
 <method name = "message update">
+    rc = -1;
 </method>
 
 <method name = "message delete">
+    rc = -1;
 </method>
 
 <private name = "header">

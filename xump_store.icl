@@ -46,18 +46,21 @@
     <request name = "queue create">
         <doc>
         Creates a new queue in the store.  If the name is null, generates a
-        queue name.  The queue may already exist. Returns 0 if OK, -1 if the
-        request failed.
+        queue name.  The queue may already exist. Constructs a xump_queue_t
+        object, if successful. Returns 0 if OK, -1 if the request failed.
         </doc>
-        <field name = "queue" type = "xump_queue_t *" />
+        <field name = "queue_p" type = "xump_queue_t **" />
+        <field name = "name"    type = "char *" />
     </request>
 
     <request name = "queue fetch">
         <doc>
         Fetches a queue from the store, by name. The queue must exist.
-        Returns 0 if OK, -1 if the request failed.
+        Constructs a new xump_queue_t object, if successful. Returns 0 if
+        OK, -1 if the request failed.
         </doc>
-        <field name = "queue" type = "xump_queue_t *" />
+        <field name = "queue_p" type = "xump_queue_t **" />
+        <field name = "name"    type = "char *" />
     </request>
 
     <request name = "queue delete">
@@ -71,21 +74,25 @@
 
     <request name = "message create">
         <doc>
-        Creates a new message in the queue.  Returns 0 if OK, -1 if the request
-        failed.
+        Creates a new message in the queue.  Constructs a xump_message_t
+        object for the caller.  Returns 0 if OK, -1 if the request failed.
         </doc>
-        <field name = "queue" type = "xump_queue_t *" />
-        <field name = "message" type = "xump_message_t *" />
+        <field name = "queue"     type = "xump_queue_t *" />
+        <field name = "message_p" type = "xump_message_t **" />
+        <field name = "address"   type = "char *" />
+        <field name = "body data" type = "void *" />
+        <field name = "body size" type = "size_t" />
     </request>
 
     <request name = "message fetch">
         <doc>
-        Fetches a message from the queue.  Returns 0 if OK, -1 if the request
-        failed.
+        Fetches a message from the queue.  Constructs a xump_message_t
+        object for the caller.  Returns 0 if OK, -1 if the request failed.
+        Index is offset from the head of the queue.
         </doc>
-        <field name = "queue" type = "xump_queue_t *" />
-        <field name = "message" type = "xump_message_t *" />
-        <field name = "index" type = "int" />
+        <field name = "queue"     type = "xump_queue_t *" />
+        <field name = "message_p" type = "xump_message_t **" />
+        <field name = "index"     type = "size_t" />
     </request>
 
     <request name = "message update">
@@ -104,7 +111,6 @@
         </doc>
         <field name = "message" type = "xump_message_t *" />
     </request>
-
 </data>
 
 <method name = "new">

@@ -142,6 +142,30 @@ of this class.
     xump_message_unlink (&message);
     message = xump_message_create (queue, "address2", "def", 4);
     xump_message_unlink (&message);
+
+    //  Check that we can fetch messages off the queue
+    message = xump_message_fetch (queue, 0);
+    assert (message);
+    assert (streq (xump_message_address (message), "address1"));
+    xump_message_unlink (&message);
+
+    message = xump_message_fetch (queue, 1);
+    assert (message);
+    assert (streq (xump_message_address (message), "address2"));
+    xump_message_unlink (&message);
+
+    //  Delete the messages and check they are gone
+    message = xump_message_fetch (queue, 0);
+    assert (message);
+    xump_message_delete (&message);
+
+    message = xump_message_fetch (queue, 0);
+    assert (message);
+    xump_message_delete (&message);
+
+    message = xump_message_fetch (queue, 0);
+    assert (message == NULL);
+
     xump_queue_unlink (&queue);
 
     xump_destroy (&xump);

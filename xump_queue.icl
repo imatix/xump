@@ -37,11 +37,13 @@ This class implements the create/fetch/delete access methods on the queue.
 <import class = "xump" />
 
 <context>
+    int64_t
+        last_id;
     <property name = "store" type = "xump_store_t *" readonly = "1" />
     <property name = "name" type = "char *" />
 </context>
 
-<method name = "new" private = "1">
+<method name = "new">
     <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
     <argument name = "name" type = "char *">Queue name, if any</argument>
     //
@@ -64,9 +66,7 @@ This class implements the create/fetch/delete access methods on the queue.
     <argument name = "name" type = "char *">Queue name, if any</argument>
     <declare name = "self" type = "$(selftype) *" />
     //
-    self = self_new (store, name);
-    if (self)
-        xump_store_request_queue_create (self->store, self);
+    xump_store_request_queue_create (store, &self, name);
 </method>
 
 <method name = "fetch" return = "self">
@@ -79,11 +79,7 @@ This class implements the create/fetch/delete access methods on the queue.
     <argument name = "name" type = "char *">Queue name, if any</argument>
     <declare name = "self" type = "$(selftype) *" />
     //
-    self = self_new (store, name);
-    if (self) {
-        if (xump_store_request_queue_fetch (self->store, self))
-            self_destroy (&self);       //  No such queue, return NULL
-    }
+    xump_store_request_queue_fetch (store, &self, name);
 </method>
 
 <method name = "delete">

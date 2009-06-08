@@ -2,6 +2,12 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-06
+
+We identify messages using a numeric ID that is unique within a queue.  It's the storage layer's responsibility to provide new IDs.  We'll use an unsigned 32-bit ID and ignore rollover.  If a single queue has more than 2^32 messages, the older ones won't be accessible.  Fair enough.
+
+Thinking: xump_message and xump_queue objects should have a void * block which is managed by the storage layer.  This requires that the constructors (at least) and destructors are called from within the storage layer.  We can constrain destruction of the void * block as icl_mem_free.
+
 ++ 2009-06-05
 
 The API is breaking one of the rules of software design, it's confusing.  I find myself looking at the code to figure out where I put the message creation code.  This ain't good.  So, I'm going to change this again, so that we create messages like we do queues, with a 'message_create' method.  This is then a 'create' method on the xump_message class, which invokes the storage portal method 'message_create'.
@@ -13,7 +19,6 @@ So what we have is:
 * xump_store.icl: queue_create, queue_fetch, queue_delete, message_create, message_fetch, message_update, message_delete.
 
 Sorry for the detour.  Sometimes we need to try stuff in order to realize that it's silly.
-
 
 ++ 2009-06-04
 

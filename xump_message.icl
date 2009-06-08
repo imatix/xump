@@ -37,14 +37,15 @@ This class implements the create/fetch/delete access methods on the message.
 <import class = "xump" />
 
 <context>
-    <property name = "store" type = "xump_store_t *" readonly = "1" />
-    <property name = "queue" type = "xump_queue_t *" readonly = "1" />
-    <property name = "address"   type = "char *" readonly = "1" />
-    <property name = "body data" type = "void *" readonly = "1" />
-    <property name = "body size" type = "size_t" readonly = "1" />
+    <property name = "id"        type = "size_t"         />
+    <property name = "store"     type = "xump_store_t *" readonly = "1" />
+    <property name = "queue"     type = "xump_queue_t *" readonly = "1" />
+    <property name = "address"   type = "char *"         readonly = "1" />
+    <property name = "body data" type = "void *"         readonly = "1" />
+    <property name = "body size" type = "size_t"         readonly = "1" />
 </context>
 
-<method name = "new" private = "1">
+<method name = "new">
     <argument name = "queue" type = "xump_queue_t *">Enclosing queue</argument>
     <argument name = "address" type = "char *">Address, if any</argument>
     <argument name = "body data" type = "void *">Body data if any</argument>
@@ -80,9 +81,8 @@ This class implements the create/fetch/delete access methods on the message.
     <argument name = "body size" type = "size_t">Size of body</argument>
     <declare name = "self" type = "$(selftype) *" />
     //
-    self = self_new (queue, address, body_data, body_size);
-    if (self)
-        xump_store_request_message_create (self->store, queue, self);
+    xump_store_request_message_create (xump_queue_store (queue),
+        queue, &self, address, body_data, body_size);
 </method>
 
 <method name = "fetch" return = "self">
@@ -96,11 +96,8 @@ This class implements the create/fetch/delete access methods on the message.
     <argument name = "index" type = "size_t">Message index</argument>
     <declare name = "self" type = "$(selftype) *" />
     //
-    self = self_new (queue, NULL, NULL, 0);
-    if (self) {
-        if (xump_store_request_message_fetch (self->store, queue, self, index))
-            self_destroy (&self);       //  No such message, return NULL
-    }
+    xump_store_request_message_fetch (xump_queue_store (queue),
+        queue, &self, index);
 </method>
 
 <method name = "update" template = "function">

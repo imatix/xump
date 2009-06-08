@@ -38,14 +38,16 @@ a name, and a list of messages.
 <context>
     ipr_looseref_list_t
         *messages;                      //  List of messages
+    size_t
+        last_id;                        //  Last issued message ID
     <property name = "name" type = "char *" />
 </context>
 
 <method name = "new">
-    <argument name = "queue" type = "xump_queue_t *" />
+    <argument name = "name" type = "char *" />
     //
     self->messages = ipr_looseref_list_new ();
-    self->name = icl_mem_strdup (xump_queue_name (queue));
+    self->name = icl_mem_strdup (name);
     icl_console_print ("I: creating RAM queue '%s'", self->name);
 </method>
 
@@ -63,13 +65,71 @@ a name, and a list of messages.
     icl_mem_free (self->name);
 </method>
 
-<method name = "accept" template = "function">
+<method name = "put message" template = "function">
     <doc>
-    Attaches a message to the tail of the queue.
+    Attaches a message to the tail of the queue.  Stamps the message with a
+    new unique id value.
     </doc>
     <argument name = "message" type = "xump_store_ram_message_t *" />
     //
+    xump_store_ram_message_set_id (message, ++self->last_id);
     ipr_looseref_queue (self->messages, message);
+</method>
+
+<method name = "get message" template = "function">
+    <doc>
+    Fetches the specified message relative to the queue head.  Returns 0 and
+    sets message_p if ok, returns -1 and sets message_p to NULL if no such
+    message.  iCL lists start at the head and end at the tail.
+    </doc>
+    <argument name = "message_p" type = "xump_store_ram_message_t **" />
+    <argument name = "index" type = "size_t" />
+    <local>
+    ipr_looseref_t
+        *looseref;
+    </local>
+    //
+    looseref = ipr_looseref_list_first (self->messages);
+    while (index-- && looseref)
+        looseref = ipr_looseref_list_next (&looseref);
+
+    if (looseref)
+        *message_p = (xump_store_ram_message_t *) (looseref->object);
+    else {
+        *message_p = NULL;
+        rc = -1;
+    }
+</method>
+
+<method name = "find message" template = "function">
+    <doc>
+    Locates the message specified by id.  Returns 0 and sets message_p if ok,
+    returns -1 and sets message_p to NULL if no such message.  This version
+    does a simple scan of all the list from the head.
+    </doc>
+    <argument name = "message_p" type = "xump_store_ram_message_t **" />
+    <argument name = "id" type = "size_t" />
+    <local>
+    ipr_looseref_t
+        *looseref;
+    </local>
+    //
+    looseref = ipr_looseref_list_first (self->messages);
+    while (looseref) {
+        xump_store_ram_message_t
+            *message;
+        message = (xump_store_ram_message_t *) (looseref->object);
+        if (xump_store_ram_message_id (message) == id) {
+            *message_p = message;
+            break;
+        }
+        else
+            looseref = ipr_looseref_list_next (&looseref);
+    }
+    if (!looseref) {
+        *message_p = NULL;
+        rc = -1;
+    }
 </method>
 
 <method name = "selftest" />
