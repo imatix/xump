@@ -8,6 +8,32 @@ I'm removing the message_update method, it does not make sense.  We define a mes
 
 The message_delete method needs to be idempotent, thus safe to call no matter what the state of the store.  Thus, before we delete the ram message we need to check that the queue exists.  We should be robust against stupid things like fetching a message, deleting the queue, then trying to delete the message.  That means we do not need to worry about the order of a teardown.  The cost is an extra lookup, eventually this can be optimised away.
 
+Message properties (fields): we do not need to manipulate these as objects; they are created and used but never (or rarely) modified for existing messages.  Thus, the fastest and simplest data structure will be an env-type block (name=value<nul>...)
+
+To implement message properties, I'm going to call these "headers", to match the SMTP/HTTP semantics.  Headers are name/value pairs, where both name and value are C strings (i.e. they cannot contain null characters).  We need to be able to store the headers for a message when we create a new message, and we need to be able to access (but rarely modify) the headers for an existing message.
+
+To implement this, we'll make a new xump_headers class that handles header fields.  A xump_message will contain a xump_headers object (or at least opportunistically, since there is no point creating xump_header objects we don't need).  Here is the test code for xump_headers:
+
+[[code]]
+xump_headers_t
+    *headers;
+
+headers = xump_headers_new ();
+xump_headers_set (headers, "a", "one");
+xump_headers_set (headers, "b", "two");
+xump_headers_set (headers, "c", "three");
+xump_headers_set (headers, "a", "value");
+assert (streq (xump_headers_get (headers, "a"), "value"));
+assert (streq (xump_headers_get (headers, "z"), ""));
+xump_headers_destroy (&headers);
+[[/code]]
+
+I've used reference counting for the xump_headers class, so that for storage layers that keep the headers in memory, there is no copying.  Fetching a message just fetches a reference to the headers.  When the last reference is deleted, the headers are also destroyed.
+
+We could eventually use the same mechanism to avoid copying message data, by holding it in buckets, which are also reference counted.  The breakeven point seems to be at about 2,300 bytes, where copying costs more than allocating a bucket using the fastest 'direct' allocator (the ALLOCATOR=direct runtime setting for Base2, which bypasses the memory debugging framework).  So in the worst case scenario, we can use buckets for messages of 2.3K and above.  But if we assume each message is read at least once, then the break-even point is lower.  Using buckets will also eliminate duplicate message content for messages that are on more than one queue (at least, for RAM-based queues).
+
+We'll come back to buckets another time, using them to reduce copying work for messages of 1K and above in size.  The current API is pretty fast already.  Creating and deleting 1M messages takes about 1 second if I switch to the direct allocator.  When compiled in release mode, I expect this to go twice as fast.
+
 ++ 2009-06-06
 
 We identify messages using a numeric ID that is unique within a queue.  It's the storage layer's responsibility to provide new IDs.  We'll use an unsigned 32-bit ID and ignore rollover.  If a single queue has more than 2^32 messages, the older ones won't be accessible.  Fair enough.

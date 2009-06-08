@@ -76,7 +76,7 @@ xump_store_ram_messg.icl class.
         ipr_hash_insert (self->queues, queue_name, ram_queue);
     }
     //  Create queue object for caller
-    *queue_p = xump_queue_new (portal, queue_name);
+    *queue_p = xump_queue_new (portal, queue_name, 0);
 </method>
 
 <method name = "queue fetch">
@@ -88,7 +88,7 @@ xump_store_ram_messg.icl class.
     assert (queue_p);
     ram_queue = ipr_hash_lookup (self->queues, name);
     if (ram_queue)
-        *queue_p = xump_queue_new (portal, name);
+        *queue_p = xump_queue_new (portal, name, xump_store_ram_queue_size (ram_queue));
     else {
         *queue_p = NULL;
         rc = -1;
@@ -121,12 +121,10 @@ xump_store_ram_messg.icl class.
     assert (message_p);
     ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
     if (ram_queue) {
-        ram_message = xump_store_ram_message_new (address, body_data, body_size);
+        ram_message = xump_store_ram_message_new (address, headers, body_data, body_size);
         xump_store_ram_queue_put_message (ram_queue, ram_message);
-        *message_p = xump_message_new (queue, address, body_data, body_size);
+        *message_p = xump_message_new (queue, address, headers, body_data, body_size);
         xump_message_set_id (*message_p, xump_store_ram_message_id (ram_message));
-        icl_console_print ("I: creating message '%s' (%d)",
-            xump_message_address (*message_p), xump_message_id (*message_p));
     }
     else {
         *message_p = NULL;
@@ -149,12 +147,10 @@ xump_store_ram_messg.icl class.
     &&  xump_store_ram_queue_get_message (ram_queue, &ram_message, index) == 0) {
         *message_p = xump_message_new (queue,
             xump_store_ram_message_address   (ram_message),
+            xump_store_ram_message_headers   (ram_message),
             xump_store_ram_message_body_data (ram_message),
             xump_store_ram_message_body_size (ram_message));
         xump_message_set_id (*message_p, xump_store_ram_message_id (ram_message));
-
-        icl_console_print ("I: fetching message '%s' (%d)",
-            xump_message_address (*message_p), xump_message_id (*message_p));
     }
     else {
         *message_p = NULL;
@@ -172,12 +168,9 @@ xump_store_ram_messg.icl class.
     //
     assert (message);
     ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (xump_message_queue (message)));
-    if (ram_queue) {
+    if (ram_queue)
         xump_store_ram_queue_delete_message (ram_queue, xump_message_id (message));
-        icl_console_print ("I: deleting message '%s' (%d)",
-            xump_message_address (message), xump_message_id (message));
-    }
-    else
+   else
         rc = -1;                        //  Error - no such queue
 </method>
 

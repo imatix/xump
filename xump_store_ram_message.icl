@@ -38,16 +38,19 @@ A message has an address, body data, and body size.
 <context>
     <property name = "id"        type = "size_t" />
     <property name = "address"   type = "char *" readonly = "1" />
+    <property name = "headers"   type = "xump_headers_t *" readonly = "1" />
     <property name = "body data" type = "void *" readonly = "1" />
     <property name = "body size" type = "size_t" readonly = "1" />
 </context>
 
 <method name = "new">
     <argument name = "address" type = "char *">Message address, if any</argument>
+    <argument name = "headers" type = "xump_headers_t *">Message headers, if any</argument>
     <argument name = "body data" type = "void *">Body data if any</argument>
     <argument name = "body size" type = "size_t">Size of body</argument>
     //
     self->address = icl_mem_strdup (address);
+    self->headers = xump_headers_link (headers);
     if (body_size) {
         self->body_size = body_size;
         self->body_data = icl_mem_alloc (body_size);
@@ -56,6 +59,7 @@ A message has an address, body data, and body size.
 </method>
 
 <method name = "destroy">
+    xump_headers_unlink (&self->headers);
     icl_mem_free (self->address);
     icl_mem_free (self->body_data);
 </method>

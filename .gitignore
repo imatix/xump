@@ -27,6 +27,12 @@ xump_store_ram_message_test_test.c
 xump_store_ram_message.h
 xump_store_ram_message.c
 xump_store_ram_message.c.o
+xump_headers_test.c
+xump_headers_test_test.c.o
+xump_headers_test_test.c
+xump_headers.h
+xump_headers.c
+xump_headers.c.o
 xump_queue_test.c
 xump_queue_test_test.c.o
 xump_queue_test_test.c
@@ -72,6 +78,9 @@ xump_store_ram_queue.o
 xump_store_ram_message_test.o
 xump_store_ram_message_test
 xump_store_ram_message.o
+xump_headers_test.o
+xump_headers_test
+xump_headers.o
 xump_queue_test.o
 xump_queue_test
 xump_queue.o

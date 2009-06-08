@@ -41,6 +41,7 @@ This class implements the create/fetch/delete access methods on the message.
     <property name = "store"     type = "xump_store_t *" readonly = "1" />
     <property name = "queue"     type = "xump_queue_t *" readonly = "1" />
     <property name = "address"   type = "char *"         readonly = "1" />
+    <property name = "headers"   type = "xump_headers_t *" readonly = "1" />
     <property name = "body data" type = "void *"         readonly = "1" />
     <property name = "body size" type = "size_t"         readonly = "1" />
     <property name = "context"   type = "void *">
@@ -55,12 +56,14 @@ This class implements the create/fetch/delete access methods on the message.
 <method name = "new">
     <argument name = "queue" type = "xump_queue_t *">Enclosing queue</argument>
     <argument name = "address" type = "char *">Address, if any</argument>
+    <argument name = "headers" type = "xump_headers_t *">Message headers, if any</argument>
     <argument name = "body data" type = "void *">Body data if any</argument>
     <argument name = "body size" type = "size_t">Size of body</argument>
     //
     self->store = xump_store_link (xump_queue_store (queue));
     self->queue = xump_queue_link (queue);
     self->address = icl_mem_strdup (address);
+    self->headers = xump_headers_link (headers);
     if (body_size) {
         assert (body_data);
         self->body_data = icl_mem_alloc (body_size);
@@ -70,8 +73,9 @@ This class implements the create/fetch/delete access methods on the message.
 </method>
 
 <method name = "destroy" private = "1">
-    xump_queue_unlink (&self->queue);
     xump_store_unlink (&self->store);
+    xump_queue_unlink (&self->queue);
+    xump_headers_unlink (&self->headers);
     icl_mem_free (self->address);
     icl_mem_free (self->body_data);
     icl_mem_free (self->context);
@@ -85,12 +89,13 @@ This class implements the create/fetch/delete access methods on the message.
     </doc>
     <argument name = "queue" type = "xump_queue_t *">Enclosing queue</argument>
     <argument name = "address" type = "char *">Message address, if any</argument>
+    <argument name = "headers" type = "xump_headers_t *">Message headers, if any</argument>
     <argument name = "body data" type = "void *">Body data if any</argument>
     <argument name = "body size" type = "size_t">Size of body</argument>
     <declare name = "self" type = "$(selftype) *" />
     //
     xump_store_request_message_create (xump_queue_store (queue),
-        queue, &self, address, body_data, body_size);
+        queue, &self, address, headers, body_data, body_size);
 </method>
 
 <method name = "fetch" return = "self">

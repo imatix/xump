@@ -41,6 +41,7 @@ a name, and a list of messages.
     size_t
         last_id;                        //  Last issued message ID
     <property name = "name" type = "char *" />
+    <property name = "size" type = "size_t" readonly = "1" />
 </context>
 
 <method name = "new">
@@ -48,7 +49,6 @@ a name, and a list of messages.
     //
     self->messages = ipr_looseref_list_new ();
     self->name = icl_mem_strdup (name);
-    icl_console_print ("I: creating RAM queue '%s'", self->name);
 </method>
 
 <method name = "destroy">
@@ -60,7 +60,6 @@ a name, and a list of messages.
     while ((message = (xump_store_ram_message_t *) ipr_looseref_pop (self->messages)))
         xump_store_ram_message_destroy (&message);
 
-    icl_console_print ("I: deleting RAM queue '%s'", self->name);
     ipr_looseref_list_destroy (&self->messages);
     icl_mem_free (self->name);
 </method>
@@ -74,6 +73,7 @@ a name, and a list of messages.
     //
     xump_store_ram_message_set_id (message, ++self->last_id);
     ipr_looseref_queue (self->messages, message);
+    self->size++;
 </method>
 
 <method name = "get message" template = "function">
@@ -153,6 +153,7 @@ a name, and a list of messages.
         if (xump_store_ram_message_id (message) == id) {
             ipr_looseref_destroy (&looseref);
             xump_store_ram_message_destroy (&message);
+            self->size--;
             rc = 0;                     //  Found, and deleted
             break;
         }

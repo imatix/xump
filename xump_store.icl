@@ -80,6 +80,7 @@
         <field name = "queue"     type = "xump_queue_t *" />
         <field name = "message_p" type = "xump_message_t **" />
         <field name = "address"   type = "char *" />
+        <field name = "headers"   type = "xump_headers_t *" />
         <field name = "body data" type = "void *" />
         <field name = "body size" type = "size_t" />
     </request>
