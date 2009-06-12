@@ -50,7 +50,7 @@
         object, if successful. Returns 0 if OK, -1 if the request failed.
         </doc>
         <field name = "queue_p" type = "xump_queue_t **" />
-        <field name = "name"    type = "char *" />
+        <field name = "name" type = "char *" />
     </request>
 
     <request name = "queue fetch">
@@ -60,7 +60,7 @@
         OK, -1 if the request failed.
         </doc>
         <field name = "queue_p" type = "xump_queue_t **" />
-        <field name = "name"    type = "char *" />
+        <field name = "name" type = "char *" />
     </request>
 
     <request name = "queue delete">
@@ -77,10 +77,10 @@
         Creates a new message in the queue.  Constructs a xump_message_t
         object for the caller.  Returns 0 if OK, -1 if the request failed.
         </doc>
-        <field name = "queue"     type = "xump_queue_t *" />
+        <field name = "queue" type = "xump_queue_t *" />
         <field name = "message_p" type = "xump_message_t **" />
-        <field name = "address"   type = "char *" />
-        <field name = "headers"   type = "xump_headers_t *" />
+        <field name = "address" type = "char *" />
+        <field name = "headers" type = "xump_headers_t *" />
         <field name = "body data" type = "void *" />
         <field name = "body size" type = "size_t" />
     </request>
@@ -91,9 +91,9 @@
         object for the caller.  Returns 0 if OK, -1 if the request failed.
         Index is offset from the head of the queue.
         </doc>
-        <field name = "queue"     type = "xump_queue_t *" />
+        <field name = "queue" type = "xump_queue_t *" />
         <field name = "message_p" type = "xump_message_t **" />
-        <field name = "index"     type = "size_t" />
+        <field name = "index" type = "size_t" />
     </request>
 
     <request name = "message delete">
@@ -103,6 +103,48 @@
         failed.  The message does not need to exist - delete is idempotent.
         </doc>
         <field name = "message" type = "xump_message_t *" />
+    </request>
+
+    <request name = "selector create">
+        <doc>
+        Creates a new selector on the queue.  Constructs a xump_selector_t
+        object for the caller.  Returns 0 if OK, -1 if the request failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *" />
+        <field name = "selector_p" type = "xump_selector_t **" />
+        <field name = "destination" type = "char *" />
+        <field name = "match type" type = "char *" />
+        <field name = "match arg" type = "char *" />
+        <field name = "operation" type = "int" />
+    </request>
+
+    <request name = "selector fetch">
+        <doc>
+        Fetches a selector by index from the queue.  Constructs a
+        xump_selector_t object for the caller.  Returns 0 if OK, -1
+        if the request failed.
+        </doc>
+        <field name = "queue" type = "xump_queue_t *" />
+        <field name = "selector_p" type = "xump_selector_t **" />
+        <field name = "index" type = "size_t" />
+    </request>
+
+    <request name = "selector delete">
+        <doc>
+        Deletes a selector from the queue.  The caller must already have
+        fetched or created the selector.  Returns 0 if OK, -1 if the request
+        failed.  The selector does not need to exist - delete is idempotent.
+        </doc>
+        <field name = "selector" type = "xump_selector_t *" />
+    </request>
+
+    <request name = "selector add credit">
+        <doc>
+        Credits a selector from the queue.  The credit amount is an integer
+        number of messages.
+        </doc>
+        <field name = "selector" type = "xump_selector_t *" />
+        <field name = "amount" type = "size_t" />
     </request>
 </data>
 

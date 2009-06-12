@@ -37,17 +37,21 @@ a name, and a list of messages.
 
 <context>
     ipr_looseref_list_t
-        *messages;                      //  List of messages
+        *messages,                      //  List of messages
+        *selectors;                     //  List of selectors
     size_t
-        last_id;                        //  Last issued message ID
+        message_id,                     //  Last issued message ID
+        selector_id;                    //  Last issued selector ID
     <property name = "name" type = "char *" />
-    <property name = "size" type = "size_t" readonly = "1" />
+    <property name = "message count" type = "size_t" readonly = "1" />
+    <property name = "selector count" type = "size_t" readonly = "1" />
 </context>
 
 <method name = "new">
     <argument name = "name" type = "char *" />
     //
     self->messages = ipr_looseref_list_new ();
+    self->selectors = ipr_looseref_list_new ();
     self->name = icl_mem_strdup (name);
 </method>
 
@@ -55,12 +59,18 @@ a name, and a list of messages.
     <local>
     xump_store_ram_message_t
         *message;
+    xump_store_ram_selector_t
+        *selector;
     </local>
     //
     while ((message = (xump_store_ram_message_t *) ipr_looseref_pop (self->messages)))
         xump_store_ram_message_destroy (&message);
-
     ipr_looseref_list_destroy (&self->messages);
+
+    while ((selector = (xump_store_ram_selector_t *) ipr_looseref_pop (self->selectors)))
+        xump_store_ram_selector_destroy (&selector);
+    ipr_looseref_list_destroy (&self->selectors);
+
     icl_mem_free (self->name);
 </method>
 
@@ -71,9 +81,9 @@ a name, and a list of messages.
     </doc>
     <argument name = "message" type = "xump_store_ram_message_t *" />
     //
-    xump_store_ram_message_set_id (message, ++self->last_id);
+    xump_store_ram_message_set_id (message, ++self->message_id);
     ipr_looseref_queue (self->messages, message);
-    self->size++;
+    self->message_count++;
 </method>
 
 <method name = "get message" template = "function">
@@ -153,7 +163,105 @@ a name, and a list of messages.
         if (xump_store_ram_message_id (message) == id) {
             ipr_looseref_destroy (&looseref);
             xump_store_ram_message_destroy (&message);
-            self->size--;
+            self->message_count--;
+            rc = 0;                     //  Found, and deleted
+            break;
+        }
+        else
+            looseref = ipr_looseref_list_next (&looseref);
+    }
+</method>
+
+<method name = "put selector" template = "function">
+    <doc>
+    Attaches a selector to the tail of the queue selector list.  Stamps the
+    selector with a new unique id value.
+    </doc>
+    <argument name = "selector" type = "xump_store_ram_selector_t *" />
+    //
+    xump_store_ram_selector_set_id (selector, ++self->selector_id);
+    ipr_looseref_queue (self->selectors, selector);
+    self->selector_count++;
+</method>
+
+<method name = "get selector" template = "function">
+    <doc>
+    Fetches the specified selector relative to the queue head.  Returns 0 and
+    sets selector_p if ok, returns -1 and sets selector_p to NULL if no such
+    selector.  iCL lists start at the head and end at the tail.
+    </doc>
+    <argument name = "selector_p" type = "xump_store_ram_selector_t **" />
+    <argument name = "index" type = "size_t" />
+    <local>
+    ipr_looseref_t
+        *looseref;
+    </local>
+    //
+    looseref = ipr_looseref_list_first (self->selectors);
+    while (index-- && looseref)
+        looseref = ipr_looseref_list_next (&looseref);
+
+    if (looseref)
+        *selector_p = (xump_store_ram_selector_t *) (looseref->object);
+    else {
+        *selector_p = NULL;
+        rc = -1;
+    }
+</method>
+
+<method name = "find selector" template = "function">
+    <doc>
+    Locates the selector specified by id.  Returns 0 and sets selector_p if ok,
+    returns -1 and sets selector_p to NULL if no such selector.  This version
+    does a simple scan of all the list from the head.
+    </doc>
+    <argument name = "selector_p" type = "xump_store_ram_selector_t **" />
+    <argument name = "id" type = "size_t" />
+    <local>
+    ipr_looseref_t
+        *looseref;
+    </local>
+    //
+    looseref = ipr_looseref_list_first (self->selectors);
+    while (looseref) {
+        xump_store_ram_selector_t
+            *selector;
+        selector = (xump_store_ram_selector_t *) (looseref->object);
+        if (xump_store_ram_selector_id (selector) == id) {
+            *selector_p = selector;
+            break;
+        }
+        else
+            looseref = ipr_looseref_list_next (&looseref);
+    }
+    if (!looseref) {
+        *selector_p = NULL;
+        rc = -1;
+    }
+</method>
+
+<method name = "delete selector" template = "function">
+    <doc>
+    Deletes the selector specified by id.  Returns 0 if the selector was
+    deleted, else returns -1.  This version does a simple scan of all the
+    list from the head.
+    </doc>
+    <argument name = "id" type = "size_t" />
+    <local>
+    ipr_looseref_t
+        *looseref;
+    </local>
+    //
+    rc = -1;                            //  Assume we don't find selector
+    looseref = ipr_looseref_list_first (self->selectors);
+    while (looseref) {
+        xump_store_ram_selector_t
+            *selector;
+        selector = (xump_store_ram_selector_t *) (looseref->object);
+        if (xump_store_ram_selector_id (selector) == id) {
+            ipr_looseref_destroy (&looseref);
+            xump_store_ram_selector_destroy (&selector);
+            self->selector_count--;
             rc = 0;                     //  Found, and deleted
             break;
         }

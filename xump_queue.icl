@@ -36,13 +36,13 @@ This class implements the create/fetch/delete access methods on the queue.
 
 <import class = "xump" />
 
-<context>
+<context readonly = "1">
     int64_t
         last_id;
-    <property name = "store" type = "xump_store_t *" readonly = "1" />
+    <property name = "store" type = "xump_store_t *" />
     <property name = "name" type = "char *" />
-    <property name = "size" type = "size_t" readonly = "1" />
-    <property name = "context"   type = "void *">
+    <property name = "size" type = "size_t" />
+    <property name = "context" type = "void *" readonly = "0" >
       Caller-defined context block, allocated by caller from heap
       <put>
         icl_mem_free (self->context);
@@ -82,7 +82,7 @@ This class implements the create/fetch/delete access methods on the queue.
 
 <method name = "fetch" return = "self">
     <doc>
-    This public method fetches a queue in the store.  It acts as a
+    This public method fetches a queue from the store.  It acts as a
     constructor and returns a new queue object when successful.  The
     caller must unlink this queue object when finished using it.
     </doc>

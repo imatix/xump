@@ -27,6 +27,12 @@ xump_store_ram_message_test_test.c
 xump_store_ram_message.h
 xump_store_ram_message.c
 xump_store_ram_message.c.o
+xump_store_ram_selector_test.c
+xump_store_ram_selector_test_test.c.o
+xump_store_ram_selector_test_test.c
+xump_store_ram_selector.h
+xump_store_ram_selector.c
+xump_store_ram_selector.c.o
 xump_headers_test.c
 xump_headers_test_test.c.o
 xump_headers_test_test.c
@@ -45,6 +51,12 @@ xump_message_test_test.c
 xump_message.h
 xump_message.c
 xump_message.c.o
+xump_selector_test.c
+xump_selector_test_test.c.o
+xump_selector_test_test.c
+xump_selector.h
+xump_selector.c
+xump_selector.c.o
 xump_test.c
 xump_test_test.c.o
 xump_test_test.c
@@ -78,6 +90,9 @@ xump_store_ram_queue.o
 xump_store_ram_message_test.o
 xump_store_ram_message_test
 xump_store_ram_message.o
+xump_store_ram_selector_test.o
+xump_store_ram_selector_test
+xump_store_ram_selector.o
 xump_headers_test.o
 xump_headers_test
 xump_headers.o
@@ -87,6 +102,9 @@ xump_queue.o
 xump_message_test.o
 xump_message_test
 xump_message.o
+xump_selector_test.o
+xump_selector_test
+xump_selector.o
 xump_test.o
 xump_test
 xump.o
@@ -115,4 +133,3 @@ panic.log
 *.lst
 
 #  End
-

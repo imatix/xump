@@ -2,6 +2,63 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-09
+
+The basics of the storage layer are now in place.  I'll extend this by adding more classes to it, and more implementations.  But first, let's start on the routing layer.  My aim is to get an end-to-end demonstration working, with null (fanout) routing.
+
+There has been discussion in the AMQP workgroup of exchanges, and their role.  In Xump's design, there is an exchange but it is universal and invisible, and is in fact the Xump instance.  While AMQP extends routing functionality by defining new exchange types, Xump extends routing functionality by defining new extensions to the single routing layer.  We'll do that using a portal API as we did for the storage layer, but this will come later.
+
+Xump uses a inverted database analogy for routing.  The caller defines //selectors// on queues, and as data flows through a queue, the routing layer applies the selectors on that queue.  This is conceptually simple but harder to make than to explain.  In AMQP land, some routing entities (exchanges) have no storage, while others (shared queues) do.  I don't like the distinction.  It should depend on the selectors and the network they feed: if the queue can empty itself immediately, it does so.  And if not, it builds up and empties when it can.
+
+So, we are going to design selectors.  I'd also thought of calling these //triggers//, which is a neat abuse of database jargon, but I think it would be inaccurate.  Yes, they are triggered by message flow, but they perform a selection action.
+
+Selectors specify //matching// and/or //filtering// operations.  Matching and filtering are two different and complementary ways of deciding whether a message M should go to queue Q or not:
+
+* Matching is complex: every possible address A has a list of selectors that specified it.  We thus match a message's address with its correspondong set of selectors, giving a "yes" decision for each of them.
+* Filtering is simple: a selector S inspects a message M and makes a yes/no decision about whether or not it wants that message.
+
+The tradeoffs are:
+
+* Matching is a fast O(logn) operation but requires that the set of possible addresses is finite and changes slowly.
+* Filtering works on any aspect of the message, or external conditions, but is a slow O(n2) operation.
+
+Typically, filtering is good for content-based routing, while matching is ideal for topic distribution where the topic tree is finite and slow to change (like stock indices, newsgroup trees, etc.)  The ideal combination is to match first, and then filter on the much smaller set of matched messages.
+
+When a new message arrives in a queue, we match it against all selectors, giving us an interim hit set.  We then filter against each selector in the hit set, giving us a final hit set.  Each selector specifies either a COPY or a MOVE operation.  We do all the COPYs first, and then we do the first MOVE.  When we do a MOVE, we push that selector to the end of the list of selectors, so that messages will be round-robined between all MOVE selectors, if there are several.
+
+In order to MOVE a message, a selector needs sufficient credit.  It gets credit from the destination, which tells it, "ready to accept N more messages".  There are two common cases: infinite credit, where messages are MOVEd without any response from the destination, and single-step, where messages are MOVEd one at a time, with confirmation for each message from the destination.
+
+So, if a queue has MOVE selectors but none have sufficient credit, messages will accumulate.  When any of the selectors receive credit, they will start to move messages again.
+
+A selector specifies a //source// and a //destination//.  While the source is always a queue, the destination can be a queue or a cursor.  I'm not sure how cursors will work, but in terms of the routing network they are end-points, where messages leave the routing network and get fed back to the outside world.
+
+For our initial end-to-end proof, we can ignore filtering.  The only natural identification for a selector is the selector itself, i.e. the concatenation of its main properties.  This is not easy to work with.  So, we'll number selectors per source queue and provide a way for applications to fetch selectors by index, exactly as we do for messages.
+
+A selector therefore defines some or all of:
+
+* A numeric identifier.
+* A source queue.
+* A destination name (a queue or cursor).
+* A match type, which defines the selector algorithm.  I'll list a few below.
+* A match argument, which is passed to the algorithm.  Its meaning depends on the match type.
+* An operation, which is one of MOVE or COPY.
+* A credit, which is an integer number of messages.  For "infinite" we'll use -1.
+
+Selectors exist in the storage layer, attached to their source queue.  It seems to make sense to hold these in the same storage layer instance as their source queue, since their lifespans are linked.  If we delete a queue, we delete all selectors attached to it.
+
+We need some mechanism to determine whether a name refers to queue, or not, and what storage layer instance that queue is in.  The simplest is probably a queue name cache in the Xump engine.  We can distinguish queue names from cursor names by convention.
+
+For now, we'll define only two match types, "EQ", which does a literal string comparison between the message address and the argument, and the empty match type, which means "all messages".  These correspond to the AMQP "direct" and "fanout" exchange types.
+
+From the above, we need to make:
+
+* A queue name cache that holds the set of all known queues and that can interrogate storage layers to know whether a queue is defined or not.
+* A xump_selector class that lets us work with selector objects held in the storage layer.  This would work similarly to xump_message.
+* New methods in the store API to handle selectors (create, fetch, delete).
+* Implementation of these methods in the RAM store.
+
+This still won't let us do message routing, but we're getting closer.
+
 ++ 2009-06-08
 
 I'm removing the message_update method, it does not make sense.  We define a message fully when we create it, and all state needed to do routing should be held in the routing layer, not the storage layer.

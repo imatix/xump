@@ -18,14 +18,15 @@
     iMatix Corporation.
  -->
 <class
-    name      = "xump_store_ram_message"
-    comment   = "Xump message class for RAM storage layer"
+    name      = "xump_store_ram_selector"
+    comment   = "Xump selector class for RAM storage layer"
     script    = "icl_gen"
     license   = "gpl"
     opaque    = "1"
     >
 <doc>
-The RAM storage layer uses this class to implement messages.
+The RAM storage layer uses this class to implement selectors. Note:
+probably needs addition of headers object for header based routing.
 </doc>
 
 <inherit class = "icl_object">
@@ -36,31 +37,29 @@ The RAM storage layer uses this class to implement messages.
 
 <context readonly = "1">
     <property name = "id" type = "size_t" readonly = "0" />
-    <property name = "address" type = "char *" />
-    <property name = "headers" type = "xump_headers_t *" />
-    <property name = "body data" type = "void *" />
-    <property name = "body size" type = "size_t" />
+    <property name = "destination" type = "char *" />
+    <property name = "match type" type = "char *" />
+    <property name = "match arg" type = "char *" />
+    <property name = "operation" type = "int" />
+    <property name = "credit" type = "int" />
 </context>
 
 <method name = "new">
-    <argument name = "address" type = "char *">Message address, if any</argument>
-    <argument name = "headers" type = "xump_headers_t *">Message headers, if any</argument>
-    <argument name = "body data" type = "void *">Body data if any</argument>
-    <argument name = "body size" type = "size_t">Size of body</argument>
+    <argument name = "destination" type = "char *" />
+    <argument name = "match type" type = "char *" />
+    <argument name = "match arg" type = "char *" />
+    <argument name = "operation" type = "int" />
     //
-    self->address = icl_mem_strdup (address);
-    self->headers = xump_headers_link (headers);
-    if (body_size) {
-        self->body_size = body_size;
-        self->body_data = icl_mem_alloc (body_size);
-        memcpy (self->body_data, body_data, body_size);
-    }
+    self->destination = icl_mem_strdup (destination);
+    self->match_type = icl_mem_strdup (match_type);
+    self->match_arg = icl_mem_strdup (match_arg);
+    self->operation = operation;
 </method>
 
 <method name = "destroy">
-    xump_headers_unlink (&self->headers);
-    icl_mem_free (self->address);
-    icl_mem_free (self->body_data);
+    icl_mem_free (self->destination);
+    icl_mem_free (self->match_type);
+    icl_mem_free (self->match_arg);
 </method>
 
 <method name = "selftest" />

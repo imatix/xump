@@ -36,15 +36,15 @@ This class implements the create/fetch/delete access methods on the message.
 
 <import class = "xump" />
 
-<context>
-    <property name = "id"        type = "size_t"         />
-    <property name = "store"     type = "xump_store_t *" readonly = "1" />
-    <property name = "queue"     type = "xump_queue_t *" readonly = "1" />
-    <property name = "address"   type = "char *"         readonly = "1" />
-    <property name = "headers"   type = "xump_headers_t *" readonly = "1" />
-    <property name = "body data" type = "void *"         readonly = "1" />
-    <property name = "body size" type = "size_t"         readonly = "1" />
-    <property name = "context"   type = "void *">
+<context readonly = "1">
+    <property name = "id" type = "size_t" readonly = "0" />
+    <property name = "store" type = "xump_store_t *" />
+    <property name = "queue" type = "xump_queue_t *" />
+    <property name = "address" type = "char *" />
+    <property name = "headers" type = "xump_headers_t *" />
+    <property name = "body data" type = "void *" />
+    <property name = "body size" type = "size_t" />
+    <property name = "context" type = "void *" readonly = "0" >
       Caller-defined context block, allocated by caller from heap
       <put>
         icl_mem_free (self->context);
