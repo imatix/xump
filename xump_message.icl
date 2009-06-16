@@ -34,6 +34,8 @@ This class implements the create/fetch/delete access methods on the message.
     <option name = "links" value = "1" />
 </inherit>
 
+<todo>Queue reference must be name, not object</todo>
+
 <import class = "xump" />
 
 <context readonly = "1">

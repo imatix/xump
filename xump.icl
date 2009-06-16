@@ -60,26 +60,49 @@ of this class.
     ipr_hash_table_destroy (&self->queues);
 </method>
 
-<method name = "set store" template = "function">
+<method name = "store create" return = "store">
     <doc>
-    Registers a store instance with the engine.  The caller is responsible
-    for creating the store using a xump_store_xyz_xump_store_new () method.
-    The engine will automatically destroy the store instance at shutdown
-    time.
-    </doc>
-    <argument name = "store" type = "xump_store_t *" />
-    //
-    xump__xump_store_bind (self, store);
-    xump_store_request_announce (store);
-    xump_store_unlink (&store);
-</method>
-
-<method name = "store" return = "store">
-    <doc>
-    Returns the named store instance, or NULL if no such store was registered.
+    Creates a new store instance of the specified type, and with the
+    specified name.  The caller must unlink the store when finished
+    using it.  The store is deleted only at exit; the caller can use
+    store_fetch to find it again, by name.  Returns null if the type
+    was not valid.
     </doc>
     <argument name = "self" type = "$(selftype) *">Reference to self</argument>
-    <argument name = "name" type = "char *" />
+    <argument name = "store type" type = "char *">Name of factory</argument>
+    <argument name = "store name" type = "char *">Name of new store</argument>
+    <declare name = "store" type = "xump_store_t *" default = "NULL" />
+    <local>
+    ipr_looseref_t
+        *looseref;                      //  Store portals are in looseref list
+    </local>
+    //
+    //  Look for factory and if we find it, create store portal
+    looseref = ipr_looseref_list_first (self->xump_store_factory_list);
+    while (looseref) {
+        xump_store_t
+            *factory = (xump_store_t *) (looseref->object);
+        if (streq (xump_store_name (factory), store_type)) {
+            store = xump_store_factory (factory, store_name);
+            break;                  //  Have a match
+        }
+        looseref = ipr_looseref_list_next (&looseref);
+    }
+    if (store) {
+        xump__xump_store_bind (self, store);
+        xump_store_request_announce (store, TRUE);
+    }
+    //  Todo: we should interrogate the store to find out all the
+    //  queues it has, for stores that are persistent.
+</method>
+
+<method name = "store fetch" return = "store">
+    <doc>
+    Returns the named store instance, or NULL if no such store was registered.
+    The caller gets a store reference that it must unlink when finished using.
+    </doc>
+    <argument name = "self" type = "$(selftype) *">Reference to self</argument>
+    <argument name = "store name" type = "char *" />
     <declare name = "store" type = "xump_store_t *" default = "NULL" />
     <local>
     ipr_looseref_t
@@ -88,21 +111,90 @@ of this class.
     //
     looseref = ipr_looseref_list_first (self->xump_store_list);
     while (looseref) {
-        store = (xump_store_t *) (looseref->object);
-        if (streq (store->name, name))
+        xump_store_t
+            *portal = (xump_store_t *) (looseref->object);
+        if (streq (xump_store_name (portal), store_name)) {
+            store = xump_store_link (portal);
             break;                      //  We've found the matching store
-        store = NULL;
+        }
         looseref = ipr_looseref_list_next (&looseref);
     }
 </method>
 
-<method name = "cache queue lookup" return = "queue">
+<method name = "store delete" template = "function">
     <doc>
-    Looks for a queue among all store instances, using the queue name
-    cache.  Returns a new xump_queue object, or NULL.
+    Delete a store specified by name.  Returns 0 if store was deleted, -1 if
+    the store did not exist.
+    </doc>
+    <argument name = "store name" type = "char *" />
+    <local>
+    ipr_looseref_t
+        *looseref;                      //  Store portals are in looseref list
+    </local>
+    //
+    looseref = ipr_looseref_list_first (self->xump_store_list);
+    while (looseref) {
+        xump_store_t
+            *store = (xump_store_t *) (looseref->object);
+        if (streq (xump_store_name (store), store_name)) {
+            //  Need to explicitly destroy client looseref, portal
+            //  implementation does not do this properly.
+            //  Todo: fix portals.
+            ipr_looseref_destroy (&store->client_looseref);
+            xump_store_request_announce (store, FALSE);
+            xump_store_destroy (&store);
+            break;                      //  We've found the matching store
+        }
+        looseref = ipr_looseref_list_next (&looseref);
+    }
+    if (!looseref)
+        rc = -1;                        //  Hit end of list with no match
+</method>
+
+<method name = "queue create" return = "queue">
+    <doc>
+    Create or fetch a queue in a specific store.  This method acts as a queue
+    constructor and returns a new queue object when successful.  The caller
+    must unlink the returned queue object when finished using it.  If the
+    queue name is null, invents a random queue name.
     </doc>
     <argument name = "self" type = "$(selftype) *" />
-    <argument name = "name" type = "char *" />
+    <argument name = "store name" type = "char *" />
+    <argument name = "queue name" type = "char *" />
+    <declare name = "queue" type = "xump_queue_t *" />
+    <local>
+    xump_store_t
+        *store;
+    icl_shortstr_t
+        random_name;
+    </local>
+    //
+    if (queue_name == NULL) {
+        queue_name = random_name;
+        do {
+            ipr_str_random (queue_name, "Q-AAAAAA");
+        } until (ipr_hash_lookup (self->queues, queue_name) == NULL);
+    }
+    //
+    //  Todo: check for and prevent two queues with same name in different
+    //  stores.  Requires that self->queues is fully populated.
+    store = xump_store_fetch (self, store_name);
+    if (store) {
+        xump_store_request_queue_create (store, &queue, queue_name);
+        //  We track the store for each known queue
+        ipr_hash_insert (self->queues, queue_name, store);
+        xump_store_unlink (&store);
+    }
+</method>
+
+<method name = "queue fetch" return = "queue">
+    <doc>
+    Fetch a queue from any store.  This method acts as a queue constructor
+    and returns a new queue object when successful.  The caller must unlink
+    the returned queue object when finished using it.
+    </doc>
+    <argument name = "self" type = "$(selftype) *" />
+    <argument name = "queue name" type = "char *" />
     <declare name = "queue" type = "xump_queue_t *" default = "NULL" />
     <local>
     xump_store_t
@@ -111,19 +203,19 @@ of this class.
         *looseref;                      //  Store portals are in looseref list
     </local>
     //
-    //  Check in local queue cache, then ask each store
-    store = ipr_hash_lookup (self->queues, name);
-    if (store) {
-        queue = xump_queue_fetch (store, name);
-        icl_console_print ("Queue found in store");
-    }
+    //  Check in local queue cache, then ask each store, since queue may
+    //  exist from a previous incarnation, if the store is persistent
+    store = ipr_hash_lookup (self->queues, queue_name);
+    if (store)
+        xump_store_request_queue_fetch (store, &queue, queue_name);
     else {
         looseref = ipr_looseref_list_first (self->xump_store_list);
         while (looseref) {
             store = (xump_store_t *) (looseref->object);
-            queue = xump_queue_fetch (store, name);
+            xump_store_request_queue_fetch (store, &queue, queue_name);
             if (queue) {
-                icl_console_print ("Queue found by store");
+                //  We track the store for each known queue
+                ipr_hash_insert (self->queues, queue_name, store);
                 break;                      //  Found our queue
             }
             looseref = ipr_looseref_list_next (&looseref);
@@ -131,10 +223,31 @@ of this class.
     }
 </method>
 
+<method name = "queue delete" template = "function">
+    <doc>
+    Delete a queue specified by name.  Returns 0 if queue was deleted, -1 if
+    the queue did not exist.
+    </doc>
+    <argument name = "queue name" type = "char *" />
+    <local>
+    xump_queue_t
+        *queue;
+    </local>
+    //
+    queue = xump_queue_fetch (self, queue_name);
+    if (queue) {
+        ipr_hash_delete (self->queues, xump_queue_name (queue));
+        xump_store_request_queue_delete (xump_queue_store (queue), queue);
+        xump_queue_unlink (&queue);
+    }
+    else
+        rc = -1;
+</method>
+
 <method name = "selftest">
     <local>
     xump_t
-        *xump;
+        *engine;
     xump_store_t
         *store;
     xump_queue_t
@@ -148,41 +261,64 @@ of this class.
     int count;
     </local>
     //
-    xump = xump_new ();
-    xump_set_store (xump, xump_store_ram__xump_store_new (NULL, "RAM1"));
-    xump_set_store (xump, xump_store_ram__xump_store_new (NULL, "RAM2"));
+    //  Create new engine instance
+    engine = xump_new ();
 
-    assert (xump_store (xump, "RAM1") != NULL);
-    assert (xump_store (xump, "RAM0") == NULL);
-    store = xump_store (xump, "RAM1");
+    //  Create portal factory for each store implementation
+    store = xump_store_ram__xump_store_factory ("RAM");
+    xump__xump_store_bind (engine, store);
+    xump_store_unlink (&store);
 
-    //  Check that the methods work
-    queue = xump_queue_create (store, "Test queue");
+    //  Check portal factory in action
+    store = xump_store_create (engine, "ROM", "store-0");
+    assert (!store);                    //  ROM is not a defined type
+    store = xump_store_create (engine, "RAM", "store-1");
+    assert (store);                     //  This should have worked
+    xump_store_unlink (&store);
+
+    //  Check we can fetch store by name
+    store = xump_store_fetch (engine, "store-0");
+    assert (!store);                    //  No such store
+    store = xump_store_fetch (engine, "store-1");
+    assert (store);                     //  This should have worked
+
+    //  Check queue methods
+    queue = xump_queue_create (engine, "store-1", "Test queue");
+    assert (queue);
+    xump_queue_unlink (&queue);
+    queue = xump_queue_fetch (engine, "Test queue");
     assert (queue);
     xump_queue_unlink (&queue);
 
-    queue = xump_queue_fetch (store, "Test queue");
-    assert (queue);
-    xump_queue_delete (&queue);
-    assert (queue == NULL);
-    queue = xump_queue_fetch (store, "Test queue");
+    assert (xump_queue_delete (engine, "Test queue") == 0);
+    assert (xump_queue_delete (engine, "Test queue") == -1);
+    queue = xump_queue_fetch (engine, "Test queue");
     assert (queue == NULL);
 
-    //  Check methods on auto-named queue
-    queue = xump_queue_create (store, NULL);
+    //  Check auto-named queue creation
+    queue = xump_queue_create (engine, "store-1", NULL);
     assert (queue);
     icl_shortstr_cpy (queue_name, xump_queue_name (queue));
     xump_queue_unlink (&queue);
 
-    queue = xump_queue_fetch (store, queue_name);
-    assert (queue);
-    xump_queue_delete (&queue);
-    assert (queue == NULL);
-    queue = xump_queue_fetch (store, queue_name);
+    assert (xump_queue_delete (engine, queue_name) == 0);
+    queue = xump_queue_fetch (engine, queue_name);
     assert (queue == NULL);
 
+    //  Check that we can work with selectors
+    queue = xump_queue_create (engine, "store-1", NULL);
+    selector = xump_selector_create (queue, "dest", "EQ", "address", XUMP_SELECTOR_COPY);
+    assert (selector);
+    xump_selector_unlink (&selector);
+    selector = xump_selector_fetch (queue, 0);
+    assert (selector);
+    assert (xump_selector_operation (selector) == XUMP_SELECTOR_COPY);
+    xump_selector_delete (&selector);
+    xump_queue_unlink (&queue);
+
+#if 0
     //  Create a queue and post messages to it
-    queue = xump_queue_create (store, NULL);
+    queue = xump_queue_create (engine, "store-1", NULL);
     icl_shortstr_cpy (queue_name, xump_queue_name (queue));
     message = xump_message_create (queue, "address1", NULL, "abc", 4);
     xump_message_unlink (&message);
@@ -203,7 +339,7 @@ of this class.
     xump_queue_unlink (&queue);
 
     //  Delete the messages and check they are gone
-    queue = xump_queue_fetch (store, queue_name);
+    queue = xump_queue_fetch (engine, queue_name);
     assert (xump_queue_size (queue) == 2);
 
     message = xump_message_fetch (queue, 0);
@@ -217,26 +353,17 @@ of this class.
     message = xump_message_fetch (queue, 0);
     assert (message == NULL);
     xump_queue_unlink (&queue);
-    queue = xump_queue_fetch (store, queue_name);
+    queue = xump_queue_fetch (engine, queue_name);
     assert (xump_queue_size (queue) == 0);
+#endif
 
-    //  Check that we can work with selectors
-    selector = xump_selector_create (queue, "dest", "EQ", "address", XUMP_SELECTOR_COPY);
-    assert (selector);
-    xump_selector_unlink (&selector);
-    selector = xump_selector_fetch (queue, 0);
-    assert (selector);
-    assert (xump_selector_operation (selector) == XUMP_SELECTOR_COPY);
-    xump_selector_delete (&selector);
-    xump_queue_unlink (&queue);
+    xump_store_unlink (&store);
 
-    //  Check engine API
-    queue = xump_cache_queue_lookup (xump, queue_name);
-    assert (queue);
-    assert (streq (xump_queue_name (queue), queue_name));
-    xump_queue_unlink (&queue);
+    //  Check we can delete store by name
+    assert (xump_store_delete (engine, "store-1") == 0);
+    assert (xump_store_delete (engine, "store-1") == -1);
 
-    xump_destroy (&xump);
+    xump_destroy (&engine);
 </method>
 
 </class>

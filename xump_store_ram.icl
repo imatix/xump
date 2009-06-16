@@ -49,34 +49,25 @@ xump_store_ram_message.icl class.
 </method>
 
 <method name = "announce">
-    icl_console_print ("I: initializing RAM-based storage instance '%s'", portal->name);
+    icl_console_print ("I: %s RAM-based storage instance '%s'",
+        opening? "initializing": "destroying", portal->name);
 </method>
 
 <method name = "queue create">
     <local>
-    icl_shortstr_t
-        queue_name;
     xump_store_ram_queue_t
         *ram_queue;
     </local>
     //
     assert (queue_p);
-    //  If queue is unnamed, invent a unique random name now
-    if (name)
-        icl_shortstr_cpy (queue_name, name);
-    else
-        do {
-            ipr_str_random (queue_name, "Q-AAAAAA");
-        } until (ipr_hash_lookup (self->queues, queue_name) == NULL);
-
     //  Either create or fetch RAM queue
-    ram_queue = ipr_hash_lookup (self->queues, queue_name);
+    ram_queue = ipr_hash_lookup (self->queues, name);
     if (ram_queue == NULL) {
-        ram_queue = xump_store_ram_queue_new (queue_name);
-        ipr_hash_insert (self->queues, queue_name, ram_queue);
+        ram_queue = xump_store_ram_queue_new (name);
+        ipr_hash_insert (self->queues, name, ram_queue);
     }
     //  Create queue object for caller
-    *queue_p = xump_queue_new (portal, queue_name, 0);
+    *queue_p = xump_queue_new (portal, name, 0);
 </method>
 
 <method name = "queue fetch">

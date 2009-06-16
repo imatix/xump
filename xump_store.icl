@@ -36,12 +36,13 @@
 <import class = "xump" />
 
 <context>
-    icl_shortstr_t
-        name;                           //  Store name
+    <property name = "name" type = "char *" readonly = "1" />
 </context>
 
 <data>
-    <request name = "announce" />
+    <request name = "announce">
+        <field name = "opening" type = "Bool">Or, closing</field>
+    </request>
 
     <request name = "queue create">
         <doc>
@@ -153,7 +154,12 @@
     Creates a new store instance object.
     </doc>
     <argument name = "name" type = "char *" />
-    icl_shortstr_cpy (self->name, name);
+    //
+    self->name = icl_mem_strdup (name);
+</method>
+
+<method name = "destroy">
+    icl_mem_free (self->name);
 </method>
 
 </class>

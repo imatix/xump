@@ -61,50 +61,10 @@ This class implements the create/fetch/delete access methods on the queue.
     self->size = size;
 </method>
 
-<method name = "destroy" private = "1">
+<method name = "destroy">
     xump_store_unlink (&self->store);
     icl_mem_free (self->name);
     icl_mem_free (self->context);
-</method>
-
-<method name = "create" return = "self">
-    <doc>
-    This public method creates or fetches a queue in the store.  It acts
-    as a constructor and returns a new queue object when successful.  The
-    caller must unlink this queue object when finished using it.
-    </doc>
-    <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
-    <argument name = "name" type = "char *">Queue name, if any</argument>
-    <declare name = "self" type = "$(selftype) *" />
-    //
-    xump_store_request_queue_create (store, &self, name);
-</method>
-
-<method name = "fetch" return = "self">
-    <doc>
-    This public method fetches a queue from the store.  It acts as a
-    constructor and returns a new queue object when successful.  The
-    caller must unlink this queue object when finished using it.
-    </doc>
-    <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
-    <argument name = "name" type = "char *">Queue name, if any</argument>
-    <declare name = "self" type = "$(selftype) *" />
-    //
-    xump_store_request_queue_fetch (store, &self, name);
-</method>
-
-<method name = "delete">
-    <doc>
-    This public method deletes a queue in the store.  It acts as a
-    destructor and nullifies the provided queue object reference.
-    The queue object may already be destroyed.
-    </doc>
-    <argument name = "self_p" type = "$(selftype) **">Queue object ref</argument>
-    assert (self_p);
-    if (*self_p) {
-        xump_store_request_queue_delete ((*self_p)->store, *self_p);
-        self_unlink (self_p);
-    }
 </method>
 
 <method name = "selftest" />

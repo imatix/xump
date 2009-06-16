@@ -31,6 +31,8 @@ selector. Note: probably needs addition of headers object for header based
 routing.
 </doc>
 
+<todo>Queue reference must be name, not object</todo>
+
 <inherit class = "icl_object">
     <option name = "alloc" value = "cache" />
     <option name = "links" value = "1" />
