@@ -2,6 +2,184 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-15
+
+Have started to reconstruct the engine API, it's looking nicer.  The methods for handling stores and queues now look like this (commit 8c3f97b):
+
+* store_ref = xump_store_create (engine, store_type, store_name);
+* store_ref = xump_store_fetch  (engine, store_name);
+* xump_store_delete (engine, store_name);
+* queue_ref = xump_queue_create (engine, store_name, queue_name);
+* queue_ref = xump_queue_fetch  (engine, queue_name);
+* xump_queue_delete (engine, queue_name);
+
+So that the queue refers to its store by name, rather than by reference.
+
+For the store portals, I've used the factory feature of IPR portals, which lets us create store instances more simply.  At startup we create a factory (also a portal) for each store implementation:
+
+[[code]]
+//  Create new engine instance
+engine = xump_new ();
+
+//  Create portal factory for each store implementation
+store = xump_store_ram__xump_store_factory ("RAM");
+xump__xump_store_bind (engine, store);
+xump_store_unlink (&store);
+[[/code]]
+
+We can then create new store instances by using the factory name as a 'store type', e.g:
+
+[[code]]
+store = xump_store_create (engine, "RAM", "store-1");
+[[/code]]
+
+The actual work of finding the right factory and getting it to create a new store instance is done in the xump_store_create method.
+
+++ 2009-06-14
+
++++ Internal accounting
+
+I've not made the engine API yet, still working through some design concepts.  Let's look at credit-based flow control.  This is needed to make MOVE work safely.  As I've said previously, for COPYs I don't want to use credit-based flow control, indeed any kind of flow control at all.
+
+I'll define a "credit" unit, so we can say that one credit corresponds to one message.  In AMQP I originally designed credit based on message volume as well but this is nasty because the semantics of credit are fundamentally not about network capacity but rather about how much the upstream trusts the downstream.  We cannot trust a recipient with fractions of a message.  (This is also why I think COPY does not need credits, because it does not imply any kind of trust relationship.)
+
+As messages move down the directed graph of queues, credits move up the graph.  Let's look at a typical scenario:
+
+* We have a queue with two selectors that each move messages to respective external destinations.
+* Each selector starts with one credit.
+* Two messages arrive, and are passed respectively to each selector.
+* Each selector moves the message it receives to its destination.
+* Each selector now has a credit of zero.
+* A new message arrives in the queue, and waits there, since there are no available selectors.
+* One of the destinations sends an acknowledgment, which is passed to its selector as a credit.
+* That selector is now able to process one more message.
+
+To some extent credits and acknowledgements are the same concept, and we might use "credit" everywhere, especially since it's easier to spell.  Thus applications send messages to queues, and credits to selectors.
+
+Providing a credit to a selector is in effect paying for a message, and credits are like an internal currency.  It makes sense that we aim to balance the books.  When a queue is itself fed by one or more MOVE selectors, and it receives credits from a selector, it must pass these credits to its parent MOVE selector(s) in turn, i.e. pay for the messages that it received.
+
+Selectors can, at any point, have outstanding messages.  That is, they may have one or more messages they provided to a destination but did not yet receive payment for.  If the selector is then deleted, it must return its outstanding messages to its source queue.  These messages can then be routed to other selectors, or bounced.
+
++++ Queue size limits
+
+It makes sense in several scenarios to set a limit on the size of a queue.  In fact there are two possible limits:
+
+* On the number of unprocessed messages;
+* On the history of processed messages.
+
+When the history gets too large, there is only one sensible strategy, namely to discard the oldest messages.  We can hardcode this, there is no need to allow for alternative strategies.
+
+When the unprocessed size gets too large, the sensible strategy is to reject the new message as an exception.  Discarding the message is an acceptable default (presumably the sender will realize, eventually, and retry or complain).
+
++++ Message exceptions
+
+There are several situations where a queue may find itself with a troublesome message that it has to deal with:
+
+* When a queue has reached its limit of unprocessed messages;
+* When a queue does not have any active selector that can accept a message.
+
+Dropping the message is a good default action but in cases where it matters, we want to send the message to someone who knows how to handle it.  That is often, but not always, the original sender.  In AMQP we discussed this question extensively and the best design we came up with (which is not in the current protocol draft, which has taken a left turn to the Moon) was to route the message on a "return address".
+
+Pushing the message forwards on an alternative route rather than returning it to the original source is as far as I can tell more robust and useful.  It does not require us to track the message's routing path.  It does not require that the source still exists.  It lets us centralize exception handling for critical queues.  And it lets us handle exceptions with the same mechanisms as deliveries.
+
+When exactly is a message "unroutable"?  It depends, but these are the cases I know of:
+
+# When a message arrives in a queue that has no selectors.  E.g. if I send a document to a print queue that has no printers attached to it.
+# When a message arrives in a queue that has no matching selectors.  E.g. if I send a document that requires color printing to a queue that has only black and white printers.
+
+In the case when a queue has selectors but they are all busy (i.e. don't have the credit to accept a new message), we can't tell if the message would be routed or not and it does not make much sense to treat it as an exception, yet.
+
+The very simplest way to handle exceptions is to move the affected messages to a 'dead-letter' queue, that is defined on a per-queue basis.  On the dead-letter queue we can put selectors that route exceptions however we like.  To make this work properly, we might want to mangle the message envelope so that the return address, if specified, is used as the address, and the original address is saved somewhere.  This is a familiar pattern from the real world.
+
+So here is a sketch for exception handling on queues:
+
+* By default, if there are no (ready) selectors, hold the message as unprocessed.
+* By default, if the unprocessed size exceeds a per-queue limit, discard new messages (and log some error).
+* By default, if there are selectors but none match, discard the message.
+* Add a BOUNCE operation that is like MOVE, but mangles the address and return addresses.
+* Allow a "default selector" that is invoked if no other selectors match.
+* Allow an "overflow selector" that is invoked if the unprocessed size hits a limit.
+
+When applications try to publish messages to non-existent queues, we can bounce those messages to some per-engine dead-letter queue.  This, when used with self-destructive queues, lets us implement a service lookup test.
+
++++ Self-destructive queues
+
+A pattern that has been very useful in AMQP and elsewhere is the "self-destructive queue".  This is a queue that deletes itself when its last selector is deleted.  Self-destructive queues are typically used for Wolfpack scenarios.
+
+++ 2009-06-12
+
+We now have basic APIs for queue, messages, and selectors, implemented in the respective classes.  These are simple wrappers, e.g. this is the xump_queue_fetch method:
+
+[[code]]
+<method name = "fetch" return = "self">
+    <doc>
+    This public method fetches a queue from the store.  It acts as a
+    constructor and returns a new queue object when successful.  The
+    caller must unlink this queue object when finished using it.
+    </doc>
+    <argument name = "store" type = "xump_store_t *">Enclosing store</argument>
+    <argument name = "name" type = "char *">Queue name, if any</argument>
+    <declare name = "self" type = "$(selftype) *" />
+    //
+    xump_store_request_queue_fetch (store, &self, name);
+</method>
+[[/code]]
+
+It's basically just a wrapper around the portal method.  Now, the problem with these basic APIs is that they don't add enough value.  For example, when we fetch a queue, it would be nicer to not have to know the store in advance.  Queue names need to be globally unique, so that selector destinations make sense.  This uniqueness should be managed by the API, so the caller code cannot get it wrong.  Thus, the API has to sit //above// all the stores.
+
+We already implemented a simple queue name cache that lets us work with queues as global objects within an engine instance, and I'll use this as the basis for a new engine-level API.  The general model will be:
+
+* The create and fetch methods will be implemented at the engine level, in the xump class.  This makes it possible to work at the engine global level.  We'll put delete at the engine level as well, for consistency.
+* Access to object properties will be via object methods.
+* Other methods, such as adding credit to a selector, will be done at the object level.
+
+Starting with stores, we want to be able to create stores by name.  This should be idempotent, so that they do not depend on a precise agreed engine state.  E.g. creating a database-backed store should work if the store already exists.
+
+Next, queues.  These are global within an engine instance.  That is, the caller can work with queues without having to specify what store they are in.  The engine must manage this.  It's only when we create a queue that we need to specify a store, and it makes sense to allow a default here.  Another option would be to use a naming convention (like a path prefix) but that means it is impossible to reconfigure a queue to use a different store, something that might be useful.  A store name as prefix remains an option, which we may come back to later.
+
+Then, selectors.  As for queues, we already have an API that works but we'll move the methods into the xump engine class as explained.  The previous implementation of the selector class referred to the source queue as an object, but it would be cleaner to refer to a queue name.
+
+The natural way to get messages out of the network seems to be to define a selector that has no destination queue, or rather, a selector that has an external destination rather than an internal queue destination.  The caller will know whether a selector is an exit node or not, when it creates it.  We will call this the "terminal" property of the selector.  That is, a selector is a terminal when it delivers messages to an external destination rather than an internal queue.  When a selector is not a terminal, its destination name must refer to an existing queue.
+
+Lastly, messages.  It seems clear there are two sets of semantics for messages:
+
+* Message flow through queues and selectors.
+* Browsing historic data in queues.
+
+For the first case, we can rely on the fact that the engine is a closed system.  That is, all output is driven by input.  If there are no inputs to the system, there will be no outputs either.  In a synchronous model, the calling application thus gives an incoming message or acknowledgment to the engine, and in return gets a set (zero or more) deliverable messages, which it can process in a loop.
+
+In an asynchronous model, the processing of messages can take an arbitrary time and the caller would not want to wait.  So, we'd want to work with callbacks (e.g. asynchronous portal reply methods).
+
+For now, we'll design both the engine and the calling application as synchronous and single-threaded, so the API will provide methods to accept incoming messages and acknowledgments, and will provide a list of outgoing messages that the caller can process.  Each "publish" pushes messages through the network until all routing is complete, and zero or more "deliveries" are push to that outgoing queue.
+
+For the case of historic data, there are two use cases I can see.  One is to scroll back and forwards through the history of a queue, a page of messages at a time: "get me the 50 previous messages".  It matches an end-user's browsing of a queue.  The semantics are classic: oldest, latest, previous, next.  The second use case is to catch up with historic data since a particular time: "give me everything since 9.00am".  In both cases, it only makes sense insofar as the queue in question has historic data, which depends on how it was configured and what selectors have done to it.
+
+In earlier sketches of Xump I used the notion of "cursors" but I'm discarding this concept, it appears to be both unnecessary and unhelpful.  It seems easier to create a new selector when we want to read historic data on a queue.
+
+The simplest form of a queue is an ordered list of messages stretching from tail (newest mesage) to head (oldest message).  New published messages are attached before the tail.  Messages are taken off the list from the head:
+
+[[code]]
+Tail           Head
+ |              |
+[M]--[M]--[M]--[M]
+<--Unprocessed -->
+[[code]]
+
+Actual queue implementations depend on the storage layer.  To implement COPY, we need to divide the queue into two sections:
+
+[[code]]
+Tail         Current               Head
+ |              |                   |
+[M]--[M]--[M]--[M]--[M]--[M]--[M]--[M]
+<--Unprocessed -->  <-- Historical -->
+[[code]]
+
+When we create a selector we can thus specify where the selector starts:
+
+* At the current position, which is the normal and default choice;
+* At the head, i.e. the oldest message
+* At any position between the current and the head.
+
 ++ 2009-06-09
 
 The basics of the storage layer are now in place.  I'll extend this by adding more classes to it, and more implementations.  But first, let's start on the routing layer.  My aim is to get an end-to-end demonstration working, with null (fanout) routing.
@@ -12,7 +190,7 @@ Xump uses a inverted database analogy for routing.  The caller defines //selecto
 
 So, we are going to design selectors.  I'd also thought of calling these //triggers//, which is a neat abuse of database jargon, but I think it would be inaccurate.  Yes, they are triggered by message flow, but they perform a selection action.
 
-Selectors specify //matching// and/or //filtering// operations.  Matching and filtering are two different and complementary ways of deciding whether a message M should go to queue Q or not:
+Selectors specify //matching// and/or //filtering// relationships between queues.  Matching and filtering are two different and complementary ways of deciding whether a message M should go to queue Q or not:
 
 * Matching is complex: every possible address A has a list of selectors that specified it.  We thus match a message's address with its correspondong set of selectors, giving a "yes" decision for each of them.
 * Filtering is simple: a selector S inspects a message M and makes a yes/no decision about whether or not it wants that message.
@@ -24,13 +202,15 @@ The tradeoffs are:
 
 Typically, filtering is good for content-based routing, while matching is ideal for topic distribution where the topic tree is finite and slow to change (like stock indices, newsgroup trees, etc.)  The ideal combination is to match first, and then filter on the much smaller set of matched messages.
 
-When a new message arrives in a queue, we match it against all selectors, giving us an interim hit set.  We then filter against each selector in the hit set, giving us a final hit set.  Each selector specifies either a COPY or a MOVE operation.  We do all the COPYs first, and then we do the first MOVE.  When we do a MOVE, we push that selector to the end of the list of selectors, so that messages will be round-robined between all MOVE selectors, if there are several.
+When a new message arrives in a queue, we match it against all selectors, giving us an interim hit set.  We then filter against each selector in the hit set, giving us a final hit set.  Each selector specifies either COPY or MOVE.  We do all the COPYs first, and then we do the first MOVE.  When we do a MOVE, we push that selector to the end of the list of selectors, so that messages will be round-robined between all MOVE selectors, if there are several.
 
-In order to MOVE a message, a selector needs sufficient credit.  It gets credit from the destination, which tells it, "ready to accept N more messages".  There are two common cases: infinite credit, where messages are MOVEd without any response from the destination, and single-step, where messages are MOVEd one at a time, with confirmation for each message from the destination.
+In order to move a message, a selector needs sufficient credit.  It gets credit from the destination queue, which tells it, "ready to accept N more messages".  There are two common cases: infinite credit, where messages are delivered without any response from the destination, and single-step, where messages are moved one at a time, with confirmation for each message from the destination.
 
-So, if a queue has MOVE selectors but none have sufficient credit, messages will accumulate.  When any of the selectors receive credit, they will start to move messages again.
+So, if a queue has selectors but none have sufficient credit, messages will accumulate.  When any of the selectors receive credit, they will start to move messages again.
 
-A selector specifies a //source// and a //destination//.  While the source is always a queue, the destination can be a queue or a cursor.  I'm not sure how cursors will work, but in terms of the routing network they are end-points, where messages leave the routing network and get fed back to the outside world.
+We could use credit COPY as well but this has some unpleasant side effects.  First, it causes source queues to fill up when destinations are slow in processing messages.  Second, it forces us to treat selectors as independent cursors on the queue, which makes O(logn) routing impossible or at least very difficult.  And it does not appear to be necessary for the use-cases we see: COPY is typically used for high-volume parrot (pub-sub) patterns where messages are never acknowledged, and where messages are pushed towards the destination as rapidly as possible, and dropped when that cannot be done, rather than backing-up source queues.
+
+A selector specifies a //source// queue and a //destination// (presumably a queue).  I'm not yet sure whether the destination is required, i.e. whether selectors are the terminators in the directed network, or whether queues are.
 
 For our initial end-to-end proof, we can ignore filtering.  The only natural identification for a selector is the selector itself, i.e. the concatenation of its main properties.  This is not easy to work with.  So, we'll number selectors per source queue and provide a way for applications to fetch selectors by index, exactly as we do for messages.
 
@@ -38,7 +218,7 @@ A selector therefore defines some or all of:
 
 * A numeric identifier.
 * A source queue.
-* A destination name (a queue or cursor).
+* A destination name.
 * A match type, which defines the selector algorithm.  I'll list a few below.
 * A match argument, which is passed to the algorithm.  Its meaning depends on the match type.
 * An operation, which is one of MOVE or COPY.
@@ -46,7 +226,7 @@ A selector therefore defines some or all of:
 
 Selectors exist in the storage layer, attached to their source queue.  It seems to make sense to hold these in the same storage layer instance as their source queue, since their lifespans are linked.  If we delete a queue, we delete all selectors attached to it.
 
-We need some mechanism to determine whether a name refers to queue, or not, and what storage layer instance that queue is in.  The simplest is probably a queue name cache in the Xump engine.  We can distinguish queue names from cursor names by convention.
+We need some mechanism to determine whether a name refers to queue, or not, and what storage layer instance that queue is in.  The simplest is probably a queue name cache in the Xump engine.
 
 For now, we'll define only two match types, "EQ", which does a literal string comparison between the message address and the argument, and the empty match type, which means "all messages".  These correspond to the AMQP "direct" and "fanout" exchange types.
 
@@ -423,7 +603,7 @@ The design of Xump is a mix of ideas collected over the last few years.  The eng
 
 Queues pull messages from other queues via //selectors//, which specify static //matching// and //filtering// operations. Selectors are like stored search criteria that act on the head of the queue, eating up or otherwise operating on messages.  A selector reads from one queue, and writes to another queue or set of queues.  Matching is a O(logn) set operation, in which Xump compares a message address to the set of selectors that read on a queue.  Filtering is a O(n2) operation in which Xump compares one message to one selector.  In theory we match first, and filter second.
 
-Selector match and filter operations are: Move, Copy, and Delete.  These work as you would expect.   Here is how two applications divide the flow of messages on a queue (the Wolfpack pattern for workload distribution):
+Selector match and filter operations are: MOVE, COPY, and DELETE.  These work as you would expect.   Here is how two applications divide the flow of messages on a queue (the Wolfpack pattern for workload distribution):
 
 [[code]]
 Queue1
@@ -457,14 +637,11 @@ Queue
 
 The implementation of selectors is extensible, via a virtual class interface, and the intention is that message processing applications that use Xump would provide their own implementations for the xump_select class.
 
-To read messages off a queue, applications (that is, messaging servers which use Xump as their embedded engine) open and close "cursors" on queues.  Xump cursors are analogous to the SQL cursor concept.  The main difference is that when a cursor is open, messages are sent asynchronously to the application.
-
 Applications use Xump by:
 
 * Constructing a directed network of queues and selectors;
-* Setting up cursors.
-* Publishing messages to queues.
-* Delivering messages received from cursors.
+* Publishing messages and acknowledgments to queues;
+* Processing messages delivered off queues.
 
 The persistence layer is extensible, via a virtual class interface, with the intention being that applications which embed Xump would provide their own storage layer implementations.  Persistence happens at the queue level, so it is possible to e.g. provide persistent subscriptions for some clients, and transient ones for others.
 
