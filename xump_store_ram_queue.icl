@@ -174,7 +174,7 @@ a name, and a list of messages.
 
 <method name = "put selector" template = "function">
     <doc>
-    Attaches a selector to the tail of the queue selector list.  Stamps the
+    Attaches a selector to the tail of the queue selector list. Stamps the
     selector with a new unique id value.
     </doc>
     <argument name = "selector" type = "xump_store_ram_selector_t *" />
@@ -186,32 +186,7 @@ a name, and a list of messages.
 
 <method name = "get selector" template = "function">
     <doc>
-    Fetches the specified selector relative to the queue head.  Returns 0 and
-    sets selector_p if ok, returns -1 and sets selector_p to NULL if no such
-    selector.  iCL lists start at the head and end at the tail.
-    </doc>
-    <argument name = "selector_p" type = "xump_store_ram_selector_t **" />
-    <argument name = "index" type = "size_t" />
-    <local>
-    ipr_looseref_t
-        *looseref;
-    </local>
-    //
-    looseref = ipr_looseref_list_first (self->selectors);
-    while (index-- && looseref)
-        looseref = ipr_looseref_list_next (&looseref);
-
-    if (looseref)
-        *selector_p = (xump_store_ram_selector_t *) (looseref->object);
-    else {
-        *selector_p = NULL;
-        rc = -1;
-    }
-</method>
-
-<method name = "find selector" template = "function">
-    <doc>
-    Locates the selector specified by id.  Returns 0 and sets selector_p if ok,
+    Fetches selector specified by id.  Returns 0 and sets selector_p if ok,
     returns -1 and sets selector_p to NULL if no such selector.  This version
     does a simple scan of all the list from the head.
     </doc>

@@ -2,6 +2,40 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-17
+
+Selectors are complex resources that form the brains of Xump, and I'd like a more expressive API for constructing them.  Here are the things we will need to be able to do:
+
+* Create, fetch and delete selectors.  It seems accurate to use a numeric ID that the caller needs to remember, and to not try to detect duplicate selectors.  We can silently prevent one message being copied into the same queue multiple times. Numbering selectors per queue, within the store, seems most sensible.
+* Specify when the selector is invoked.  The different options are: when a message address matches some match criteria, when a message matches some filter criteria, when a message enters a queue, when a message enters a full queue, when no other selectors are invoked (the default selector, thus), and always.
+* Specify what to do when the selector is invoked.  The different options are: copy to another queue, move to another queue, deliver to a named destination in the calling application, delete the message, bounce to another queue (mangling the address and return address).
+* Enable or disable a selector.  This lets us configure a selector and then enable it, ensuring that half-configured selectors are not used, if the engine has a multithreaded implementation.
+* Top-up a selector with credit.
+
+This breakdown lets us sketch a new engine-level API for selectors:
+
+* selector_ref = xump_selector_create (engine, queue_name);
+* selector_ref = xump_selector_fetch (engine, queue_name, selector_id);
+* xump_selector_delete (engine, queue_name, selector_id);
+* xump_selector_when_match (selector_ref, operation, pattern);
+* xump_selector_when_filter (selector_ref, operation, argument);
+* xump_selector_when_entry (selector_ref);
+* xump_selector_when_overflow (selector_ref);
+* xump_selector_when_default (selector_ref);
+* xump_selector_when_always (selector_ref);
+* xump_selector_do_copy (selector_ref, target_queue);
+* xump_selector_do_move (selector_ref, target_queue);
+* xump_selector_do_deliver (selector_ref, destination);
+* xump_selector_do_bounce (selector_ref, target_queue);
+* xump_selector_enable (selector_ref, on_off);
+* xump_selector_credit (selector_ref, credits);
+
+It's a lot of methods but each is simple and clear.  We'll put create/fetch/delete in the xump engine class, and all the others into the xump_selector class.  There are further design ideas I'll note but come back to later:
+
+* allowing the target queue and destination to be taken from the message envelope.  This would let us use a single selector to route to many different points.
+* extending the when_match method to specify an envelope field name (rather than always matching address).
+* allowing multiple 'when' events, especially for matches, with Boolean operators ("match this AND that AND that").
+
 ++ 2009-06-15
 
 Have started to reconstruct the engine API, it's looking nicer.  The methods for handling stores and queues now look like this (commit 8c3f97b):

@@ -25,8 +25,7 @@
     opaque    = "1"
     >
 <doc>
-The RAM storage layer uses this class to implement selectors. Note:
-probably needs addition of headers object for header based routing.
+The RAM storage layer uses this class to implement selectors.
 </doc>
 
 <inherit class = "icl_object">
@@ -36,30 +35,13 @@ probably needs addition of headers object for header based routing.
 <import class = "xump" />
 
 <context readonly = "1">
-    <property name = "id" type = "size_t" readonly = "0" />
-    <property name = "destination" type = "char *" />
-    <property name = "match type" type = "char *" />
-    <property name = "match arg" type = "char *" />
-    <property name = "operation" type = "int" />
-    <property name = "credit" type = "int" />
+    <property name = "id" type = "uint" readonly = "0" />
 </context>
 
 <method name = "new">
-    <argument name = "destination" type = "char *" />
-    <argument name = "match type" type = "char *" />
-    <argument name = "match arg" type = "char *" />
-    <argument name = "operation" type = "int" />
-    //
-    self->destination = icl_mem_strdup (destination);
-    self->match_type = icl_mem_strdup (match_type);
-    self->match_arg = icl_mem_strdup (match_arg);
-    self->operation = operation;
 </method>
 
 <method name = "destroy">
-    icl_mem_free (self->destination);
-    icl_mem_free (self->match_type);
-    icl_mem_free (self->match_arg);
 </method>
 
 <method name = "selftest" />

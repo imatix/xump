@@ -244,6 +244,83 @@ of this class.
         rc = -1;
 </method>
 
+<method name = "selector create" return = "selector">
+    <doc>
+    Create a new selector on the specified queue.  This method acts as a
+    constructor and returns a new selector object when successful. The caller
+    must unlink this selector object when finished using it. Returns null if
+    the selector could not be created (no such queue).
+    </doc>
+    <argument name = "self" type = "$(selftype) *" />
+    <argument name = "queue name" type = "char *" />
+    <declare name = "selector" type = "xump_selector_t *" default = "NULL" />
+    <local>
+    xump_queue_t
+        *queue;
+    </local>
+    //
+    queue = xump_queue_fetch (self, queue_name);
+    if (queue) {
+        xump_store_request_selector_create (
+            xump_queue_store (queue), queue, &selector);
+        xump_queue_unlink (&queue);
+    }
+</method>
+
+<method name = "selector fetch" return = "selector">
+    <doc>
+    Fetches a selector from a queue.  This method acts as a constructor and
+    returns a new selector object when successful.  The caller must unlink
+    this selector object when finished using it.  If the queue or the selector
+    does not exist, returns NULL.
+    </doc>
+    <argument name = "self" type = "$(selftype) *" />
+    <argument name = "queue name" type = "char *" />
+    <argument name = "id" type = "uint" />
+    <declare name = "selector" type = "xump_selector_t *" default = "NULL" />
+    <local>
+    xump_queue_t
+        *queue;
+    </local>
+    //
+    queue = xump_queue_fetch (self, queue_name);
+    if (queue) {
+        xump_store_request_selector_fetch (
+            xump_queue_store (queue), queue, &selector, id);
+        xump_queue_unlink (&queue);
+    }
+</method>
+
+<method name = "selector delete" template = "function">
+    <doc>
+    Deletes a selector from the queue.  Returns 0 if selector was deleted,
+    -1 if the queue or selector did not exist.
+    </doc>
+    <argument name = "queue name" type = "char *" />
+    <argument name = "id" type = "uint" />
+    <local>
+    xump_queue_t
+        *queue;
+    xump_selector_t
+        *selector;
+    </local>
+    //
+    queue = xump_queue_fetch (self, queue_name);
+    if (queue) {
+        selector = xump_selector_fetch (self, queue_name, id);
+        if (selector) {
+            xump_store_request_selector_delete (
+                xump_queue_store (queue), selector);
+            xump_selector_unlink (&selector);
+        }
+        else
+            rc = -1;
+        xump_queue_unlink (&queue);
+    }
+    else
+        rc = -1;
+</method>
+
 <method name = "selftest">
     <local>
     xump_t
@@ -258,7 +335,8 @@ of this class.
         *selector;
     icl_shortstr_t
         queue_name;
-    int count;
+    uint
+        selector_id;
     </local>
     //
     //  Create new engine instance
@@ -306,14 +384,16 @@ of this class.
     assert (queue == NULL);
 
     //  Check that we can work with selectors
-    queue = xump_queue_create (engine, "store-1", NULL);
-    selector = xump_selector_create (queue, "dest", "EQ", "address", XUMP_SELECTOR_COPY);
+    icl_shortstr_cpy (queue_name, "queue-001");
+    queue = xump_queue_create (engine, "store-1", queue_name);
+    selector = xump_selector_create (engine, queue_name);
+    assert (selector);
+    selector_id = xump_selector_id (selector);
+    xump_selector_unlink (&selector);
+    selector = xump_selector_fetch (engine, queue_name, selector_id);
     assert (selector);
     xump_selector_unlink (&selector);
-    selector = xump_selector_fetch (queue, 0);
-    assert (selector);
-    assert (xump_selector_operation (selector) == XUMP_SELECTOR_COPY);
-    xump_selector_delete (&selector);
+    xump_selector_delete (engine, queue_name, selector_id);
     xump_queue_unlink (&queue);
 
 #if 0

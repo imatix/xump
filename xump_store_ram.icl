@@ -61,13 +61,13 @@ xump_store_ram_message.icl class.
     //
     assert (queue_p);
     //  Either create or fetch RAM queue
-    ram_queue = ipr_hash_lookup (self->queues, name);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue == NULL) {
-        ram_queue = xump_store_ram_queue_new (name);
-        ipr_hash_insert (self->queues, name, ram_queue);
+        ram_queue = xump_store_ram_queue_new (queue_name);
+        ipr_hash_insert (self->queues, queue_name, ram_queue);
     }
     //  Create queue object for caller
-    *queue_p = xump_queue_new (portal, name, 0);
+    *queue_p = xump_queue_new (portal, queue_name, 0);
 </method>
 
 <method name = "queue fetch">
@@ -77,9 +77,9 @@ xump_store_ram_message.icl class.
     </local>
     //
     assert (queue_p);
-    ram_queue = ipr_hash_lookup (self->queues, name);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue)
-        *queue_p = xump_queue_new (portal, name,
+        *queue_p = xump_queue_new (portal, queue_name,
             xump_store_ram_queue_message_count (ram_queue));
     else {
         *queue_p = NULL;
@@ -91,14 +91,85 @@ xump_store_ram_message.icl class.
     <local>
     xump_store_ram_queue_t
         *ram_queue;
+    char
+        *queue_name;
     </local>
     //
     assert (queue);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
+    queue_name = xump_queue_name (queue);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue) {
         xump_store_ram_queue_destroy (&ram_queue);
-        ipr_hash_delete (self->queues, xump_queue_name (queue));
+        ipr_hash_delete (self->queues, queue_name);
     }
+</method>
+
+<method name = "selector create">
+    <local>
+    xump_store_ram_queue_t
+        *ram_queue;
+    xump_store_ram_selector_t
+        *ram_selector;
+    char
+        *queue_name;
+    </local>
+    //
+    assert (queue);
+    assert (selector_p);
+    queue_name = xump_queue_name (queue);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
+    if (ram_queue) {
+        ram_selector = xump_store_ram_selector_new ();
+        xump_store_ram_queue_put_selector (ram_queue, ram_selector);
+        *selector_p = xump_selector_new (queue_name, xump_store_ram_selector_id (ram_selector));
+    }
+    else {
+        *selector_p = NULL;
+        rc = -1;                        //  Error - no such queue
+    }
+</method>
+
+<method name = "selector fetch">
+    <local>
+    xump_store_ram_queue_t
+        *ram_queue;
+    xump_store_ram_selector_t
+        *ram_selector;
+    char
+        *queue_name;
+    </local>
+    //
+    assert (queue);
+    assert (selector_p);
+    queue_name = xump_queue_name (queue);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
+    if (ram_queue
+    &&  xump_store_ram_queue_get_selector (ram_queue, &ram_selector, id) == 0) {
+        *selector_p = xump_selector_new (queue_name, xump_store_ram_selector_id (ram_selector));
+    }
+    else {
+        *selector_p = NULL;
+        rc = -1;                        //  Error - no such queue
+    }
+</method>
+
+<method name = "selector delete">
+    <local>
+    xump_store_ram_queue_t
+        *ram_queue;
+    xump_store_ram_selector_t
+        *ram_selector;
+    char
+        *queue_name;
+    </local>
+    //
+    assert (selector);
+    queue_name = xump_selector_queue_name (selector);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
+    if (ram_queue)
+        xump_store_ram_queue_delete_selector (ram_queue, xump_selector_id (selector));
+   else
+        rc = -1;                        //  Error - no such queue
 </method>
 
 <method name = "message create">
@@ -107,11 +178,14 @@ xump_store_ram_message.icl class.
         *ram_queue;
     xump_store_ram_message_t
         *ram_message;
+    char
+        *queue_name;
     </local>
     //
     assert (queue);
     assert (message_p);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
+    queue_name = xump_queue_name (queue);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue) {
         ram_message = xump_store_ram_message_new (address, headers, body_data, body_size);
         xump_store_ram_queue_put_message (ram_queue, ram_message);
@@ -130,11 +204,14 @@ xump_store_ram_message.icl class.
         *ram_queue;
     xump_store_ram_message_t
         *ram_message;
+    char
+        *queue_name;
     </local>
     //
     assert (queue);
     assert (message_p);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
+    queue_name = xump_queue_name (queue);
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue
     &&  xump_store_ram_queue_get_message (ram_queue, &ram_message, index) == 0) {
         *message_p = xump_message_new (queue,
@@ -156,83 +233,17 @@ xump_store_ram_message.icl class.
         *ram_queue;
     xump_store_ram_message_t
         *ram_message;
+    char
+        *queue_name;
     </local>
     //
     assert (message);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (xump_message_queue (message)));
+    queue_name = xump_queue_name (xump_message_queue (message));
+    ram_queue = ipr_hash_lookup (self->queues, queue_name);
     if (ram_queue)
         xump_store_ram_queue_delete_message (ram_queue, xump_message_id (message));
    else
         rc = -1;                        //  Error - no such queue
-</method>
-
-<method name = "selector create">
-    <local>
-    xump_store_ram_queue_t
-        *ram_queue;
-    xump_store_ram_selector_t
-        *ram_selector;
-    </local>
-    //
-    assert (queue);
-    assert (selector_p);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
-    if (ram_queue) {
-        ram_selector = xump_store_ram_selector_new (destination, match_type, match_arg, operation);
-        xump_store_ram_queue_put_selector (ram_queue, ram_selector);
-        *selector_p = xump_selector_new (queue, destination, match_type, match_arg, operation);
-        xump_selector_set_id (*selector_p, xump_store_ram_selector_id (ram_selector));
-    }
-    else {
-        *selector_p = NULL;
-        rc = -1;                        //  Error - no such queue
-    }
-</method>
-
-<method name = "selector fetch">
-    <local>
-    xump_store_ram_queue_t
-        *ram_queue;
-    xump_store_ram_selector_t
-        *ram_selector;
-    </local>
-    //
-    assert (queue);
-    assert (selector_p);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (queue));
-    if (ram_queue
-    &&  xump_store_ram_queue_get_selector (ram_queue, &ram_selector, index) == 0) {
-        *selector_p = xump_selector_new (queue,
-            xump_store_ram_selector_destination (ram_selector),
-            xump_store_ram_selector_match_type  (ram_selector),
-            xump_store_ram_selector_match_arg   (ram_selector),
-            xump_store_ram_selector_operation   (ram_selector));
-        xump_selector_set_id (*selector_p, xump_store_ram_selector_id (ram_selector));
-    }
-    else {
-        *selector_p = NULL;
-        rc = -1;                        //  Error - no such queue
-    }
-</method>
-
-<method name = "selector delete">
-    <local>
-    xump_store_ram_queue_t
-        *ram_queue;
-    xump_store_ram_selector_t
-        *ram_selector;
-    </local>
-    //
-    assert (selector);
-    ram_queue = ipr_hash_lookup (self->queues, xump_queue_name (xump_selector_queue (selector)));
-    if (ram_queue)
-        xump_store_ram_queue_delete_selector (ram_queue, xump_selector_id (selector));
-   else
-        rc = -1;                        //  Error - no such queue
-</method>
-
-<method name = "selector add credit">
-    rc = -1;
 </method>
 
 <private name = "header">

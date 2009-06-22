@@ -26,7 +26,6 @@
     >
 <doc>
 The xump_queue class references a queue resource held in a storage layer.
-This class implements the create/fetch/delete access methods on the queue.
 </doc>
 
 <inherit class = "icl_object">
