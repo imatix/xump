@@ -18,11 +18,10 @@
     iMatix Corporation.
  -->
 <class
-    name      = "xump_selector"
-    comment   = "Xump selector class"
-    script    = "icl_gen"
-    license   = "gpl"
-    opaque    = "1"
+    name    = "xump_selector"
+    comment = "Xump selector class"
+    script  = "icl_gen"
+    license = "gpl"
     >
 <doc>
 The xump_selector class references a selector resource held in a storage
@@ -37,50 +36,54 @@ routing.
 
 <import class = "xump" />
 
-<private name = "header">
+<public name = "header">
 //  Selector events
-#define WHEN_MATCH      1
-#define WHEN_FILTER     2
-#define WHEN_ENTRY      3
-#define WHEN_OVERFLOW   4
-#define WHEN_DEFAULT    5
+#define SELECTOR_WHEN_MATCH      1
+#define SELECTOR_WHEN_FILTER     2
+#define SELECTOR_WHEN_ALWAYS     3
+#define SELECTOR_WHEN_OVERFLOW   4
+#define SELECTOR_WHEN_DEFAULT    5
 
 //  Selector actions
-#define DO_COPY         1
-#define DO_MOVE         2
-#define DO_DELIVER      3
-#define DO_BOUNCE       4
-</private>
+#define SELECTOR_DO_COPY         1
+#define SELECTOR_DO_MOVE         2
+#define SELECTOR_DO_DELIVER      3
+#define SELECTOR_DO_BOUNCE       4
+</public>
 
-<context readonly = "1">
+<context>
+    uint
+        id;
+    char
+        *source_queue,                  //  Queue where selector sits
+        *target_queue,                  //  Optional target for messages
+        *operator,                      //  Operator for event detection
+        *argument,                      //  Argument for event detection
+        *address;                       //  New address for action
     int
         event,                          //  When to invoke selector
         action;                         //  What to do when invoked
-    char
-        *operator,                      //  Operator for event detection
-        *argument,                      //  Argument for event detection
-        *target;                        //  Named target for action
     Bool
         enabled;                        //  Active y/n?
     uint
         credits;                        //  Selector credits
-    <property name = "id" type = "uint" />
-    <property name = "queue name" type = "char *" />
 </context>
 
 <method name = "new">
-    <argument name = "queue name" type = "char *" />
     <argument name = "id" type = "uint" />
+    <argument name = "source queue" type = "char *" />
     //
     self->id = id;
-    self->queue_name = icl_mem_strdup (queue_name);
+    self->source_queue = icl_mem_strdup (source_queue);
 </method>
 
 <method name = "destroy" private = "1">
-    icl_mem_free (self->queue_name);
+    icl_mem_free (self->source_queue);
+    icl_mem_free (self->target_queue);
     icl_mem_free (self->operator);
     icl_mem_free (self->argument);
-    icl_mem_free (self->target);
+    icl_mem_free (self->target_queue);
+    icl_mem_free (self->address);
 </method>
 
 <method name = "when match" template = "function">
@@ -96,7 +99,7 @@ routing.
         icl_console_print ("E: cannot register multiple events for selector");
         assert (!self->event);
     }
-    self->event = WHEN_MATCH;
+    self->event = SELECTOR_WHEN_MATCH;
     self->operator = icl_mem_strdup (operator);
     self->argument = icl_mem_strdup (argument);
 </method>
@@ -114,12 +117,12 @@ routing.
         icl_console_print ("E: cannot register multiple events for selector");
         assert (!self->event);
     }
-    self->event = WHEN_FILTER;
+    self->event = SELECTOR_WHEN_FILTER;
     self->operator = icl_mem_strdup (operator);
     self->argument = icl_mem_strdup (argument);
 </method>
 
-<method name = "when entry" template = "function">
+<method name = "when always" template = "function">
     <doc>
     Specifies that the selector is invoked on every message that enters the
     queue. May not be mixed with other 'when' methods.
@@ -129,7 +132,7 @@ routing.
         icl_console_print ("E: cannot register multiple events for selector");
         assert (!self->event);
     }
-    self->event = WHEN_ENTRY;
+    self->event = SELECTOR_WHEN_ALWAYS;
 </method>
 
 <method name = "when overflow" template = "function">
@@ -142,7 +145,7 @@ routing.
         icl_console_print ("E: cannot register multiple events for selector");
         assert (!self->event);
     }
-    self->event = WHEN_OVERFLOW;
+    self->event = SELECTOR_WHEN_OVERFLOW;
 </method>
 
 <method name = "when default" template = "function">
@@ -156,65 +159,69 @@ routing.
         icl_console_print ("E: cannot register multiple events for selector");
         assert (!self->event);
     }
-    self->event = WHEN_DEFAULT;
+    self->event = SELECTOR_WHEN_DEFAULT;
 </method>
 
 <method name = "do copy" template = "function">
     <doc>
-    Specifies the selector action 'copy message to another queue'.
+    When the selector is invoked, it will copy the message to the specified
+    queue.
     </doc>
-    <argument name = "queue name" type = "char *" />
+    <argument name = "target queue" type = "char *" />
     //
     if (self->action) {
         icl_console_print ("E: cannot register multiple actions for selector");
         assert (!self->action);
     }
-    self->action = DO_COPY;
-    self->target = icl_mem_strdup (queue_name);
+    self->action = SELECTOR_DO_COPY;
+    self->target_queue = icl_mem_strdup (target_queue);
 </method>
 
 <method name = "do move" template = "function">
     <doc>
-    Specifies the selector action 'move to another queue'
+    When the selector is invoked, it will move the message to the specified
+    queue.
     </doc>
-    <argument name = "queue name" type = "char *" />
+    <argument name = "target queue" type = "char *" />
     //
     if (self->action) {
         icl_console_print ("E: cannot register multiple actions for selector");
         assert (!self->action);
     }
-    self->action = DO_MOVE;
-    self->target = icl_mem_strdup (queue_name);
+    self->action = SELECTOR_DO_MOVE;
+    self->target_queue = icl_mem_strdup (target_queue);
 </method>
 
 <method name = "do deliver" template = "function">
     <doc>
-    Specifies the selector action 'deliver to a named destination in the
-    calling application'
+    When the selector is invoked, it will move the message to the specified
+    queue, setting the message address to the new value specified.
     </doc>
-    <argument name = "destination" type = "char *" />
+    <argument name = "target queue" type = "char *" />
+    <argument name = "address" type = "char *" />
     //
     if (self->action) {
         icl_console_print ("E: cannot register multiple actions for selector");
         assert (!self->action);
     }
-    self->action = DO_DELIVER;
-    self->target = icl_mem_strdup (destination);
+    self->action = SELECTOR_DO_DELIVER;
+    self->target_queue = icl_mem_strdup (target_queue);
+    self->address = icl_mem_strdup (address);
 </method>
 
 <method name = "do bounce" template = "function">
     <doc>
-    Specifies the selector action 'bounce to another queue, mangling the
-    address and return address'.
+    When the selector is invoked, it will move the message to the specified
+    queue, setting the message address to the message return address, if any.
     </doc>
-    <argument name = "queue name" type = "char *" />
+    <argument name = "target queue" type = "char *" />
     //
     if (self->action) {
         icl_console_print ("E: cannot register multiple actions for selector");
         assert (!self->action);
     }
-    self->action = DO_BOUNCE;
-    self->target = icl_mem_strdup (queue_name);
+    self->action = SELECTOR_DO_BOUNCE;
+    self->target_queue = icl_mem_strdup (target_queue);
 </method>
 
 <method name = "enable" template = "function">
@@ -230,7 +237,8 @@ routing.
 
 <method name = "credit" template = "function">
     <doc>
-    Adds a specified number of credits to the selector.
+    Adds a specified number of credits to the selector.  When the selector
+    has
     </doc>
     <argument name = "credits" type = "uint" />
     //

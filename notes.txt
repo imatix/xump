@@ -2,12 +2,66 @@ Extensible Universal Message Processor
 
 Notes, in reverse chronological order.
 
+++ 2009-06-23
+
+Some changes to make:
+
+* The deliver action should act like MOVE, with a target queue, and with a destination name that is stamped onto the message envelope (as a property of the message rather than a field, probably).
+* The selector API should not go through to the storage layer.  It should be entirely managed by the engine, in the routing layer.  There should be no knowledge of selectors in the storage portal API.
+* The main test cases should implement and test the three patterns.
+
+And some incidental design notes:
+
+* Queues will need to hold onto moved messages that have not been accounted for.  When a selector is deleted, any messages it accepted but did not pay for must be moved back to the queue and processed again.
+* The interface between routing layer and storage layer will need methods like "acquire message X" (move, with credit pending) and "confirm message X" (pay for message).  I'll work on better language.
+
+The selector data structures in the engine context will be very simple and stupid: a list of selector objects, nothing more.  Deleting a selector or a queue (and all its selectors) will be an unscalable O(n2).  Later we will design better structures, indexed by selector ID and queue name (actually, by both source and target queues).
+
+++ 2009-06-22
+
+Let's sketch how we use the selector API to construct the Housecat, Parrot, and Wolfpack patterns.  We'll assume that routing magically works.  Here is how we build Housecat:
+
+* create "housecat" queue for routing
+* create private queue for recipient
+* create selector on "housecat" queue
+* configure selector "when match" on recipient queue name
+* configure selector "do copy" to recipient queue
+* create selector on recipient queue
+* configure selector "when always"
+* configure selector "do deliver" to recipient
+
+A single housecat queue can handle all recipients.  In practice the housecat queue will always be empty, as messages are routed immediately to recipient queues where they are delivered to the external recipient.  If we use credit based flow control, messages might back-up in the recipient queue but not in the housecat queue (since we use COPY, which is not credit-dependent, rather than MOVE, which is).
+
+Here is how we build Parrot:
+
+* create "parrot" queue for routing
+* create private queue for recipient
+* create selector on "parrot" queue
+* configure selector "when match" on routing pattern
+* configure selector "do copy" to recipient queue
+* create selector on each recipient queue
+* configure selector "when always"
+* configure selector "do deliver" to recipient
+
+A single parrot queue can handle all topics.  Which is actually identical to Housecat except that the "when match" would in practice use a different operator.  This is what we would expect.
+
+Here is how we build Wolfpack:
+
+* create named queue for each service
+* create private queue for each recipient
+* create selector on service queue
+* configure selector "when always"
+* configure selector "do move" to recipient queue
+* create selector on each recipient queue
+* configure selector "when always"
+* configure selector "do deliver" to recipient
+
 ++ 2009-06-17
 
 Selectors are complex resources that form the brains of Xump, and I'd like a more expressive API for constructing them.  Here are the things we will need to be able to do:
 
 * Create, fetch and delete selectors.  It seems accurate to use a numeric ID that the caller needs to remember, and to not try to detect duplicate selectors.  We can silently prevent one message being copied into the same queue multiple times. Numbering selectors per queue, within the store, seems most sensible.
-* Specify when the selector is invoked.  The different options are: when a message address matches some match criteria, when a message matches some filter criteria, when a message enters a queue, when a message enters a full queue, when no other selectors are invoked (the default selector, thus).
+* Specify when the selector is invoked.  The different options are: when a message address matches some match criteria, when a message matches some filter criteria, on every message, when a message enters a full queue, when no other selectors are invoked (the default selector, thus).
 * Specify what to do when the selector is invoked.  The different options are: copy to another queue, move to another queue, deliver to a named destination in the calling application, delete the message, bounce to another queue (mangling the address and return address).
 * Enable or disable a selector.  This lets us configure a selector and then enable it, ensuring that half-configured selectors are not used, if the engine has a multithreaded implementation.
 * Top-up a selector with credit.
@@ -19,7 +73,7 @@ This breakdown lets us sketch a new engine-level API for selectors:
 * xump_selector_delete (engine, queue_name, selector_id);
 * xump_selector_when_match (selector_ref, operator, pattern);
 * xump_selector_when_filter (selector_ref, operator, argument);
-* xump_selector_when_entry (selector_ref);
+* xump_selector_when_always (selector_ref);
 * xump_selector_when_overflow (selector_ref);
 * xump_selector_when_default (selector_ref);
 * xump_selector_do_copy (selector_ref, target_queue);

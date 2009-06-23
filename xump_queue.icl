@@ -60,7 +60,7 @@ The xump_queue class references a queue resource held in a storage layer.
     self->size = size;
 </method>
 
-<method name = "destroy">
+<method name = "destroy" private = "1">
     xump_store_unlink (&self->store);
     icl_mem_free (self->name);
     icl_mem_free (self->context);

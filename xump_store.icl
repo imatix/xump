@@ -73,34 +73,6 @@
         <field name = "queue" type = "xump_queue_t *" />
     </request>
 
-    <request name = "selector create">
-        <doc>
-        Creates a new selector on the queue.  Constructs a xump_selector_t
-        object for the caller.  Returns 0 if OK, -1 if the request failed.
-        </doc>
-        <field name = "queue" type = "xump_queue_t *" />
-        <field name = "selector_p" type = "xump_selector_t **" />
-    </request>
-
-    <request name = "selector fetch">
-        <doc>
-        Fetches a selector by ID.  Constructs a xump_selector_t object for
-        the caller.  Returns 0 if OK, -1 if the request failed.
-        </doc>
-        <field name = "queue" type = "xump_queue_t *" />
-        <field name = "selector_p" type = "xump_selector_t **" />
-        <field name = "id" type = "uint" />
-    </request>
-
-    <request name = "selector delete">
-        <doc>
-        Deletes a selector from the queue.  The caller must already have
-        fetched or created the selector.  Returns 0 if OK, -1 if the request
-        failed.  The selector does not need to exist - delete is idempotent.
-        </doc>
-        <field name = "selector" type = "xump_selector_t *" />
-    </request>
-
     <request name = "message create">
         <doc>
         Creates a new message in the queue.  Constructs a xump_message_t

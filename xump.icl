@@ -41,11 +41,14 @@ of this class.
 <import class = "xump_store_ram" />
 <import class = "xump_store_ram_queue" />
 <import class = "xump_store_ram_message" />
-<import class = "xump_store_ram_selector" />
 
 <context>
     ipr_hash_table_t
         *queues;                        //  Queues that engine manages
+    ipr_looseref_list_t
+        *selectors;                     //  List of selectors
+    uint
+        selector_id;                    //  Last issued selector ID
 </context>
 
 <method name = "new">
@@ -54,10 +57,19 @@ of this class.
     for stores and the resources they contain.
     </doc>
     self->queues = ipr_hash_table_new ();
+    self->selectors = ipr_looseref_list_new ();
 </method>
 
 <method name = "destroy">
+    <local>
+    xump_selector_t
+        *selector;
+    </local>
+    //
     ipr_hash_table_destroy (&self->queues);
+    while ((selector = (xump_selector_t *) ipr_looseref_pop (self->selectors)))
+        xump_selector_destroy (&selector);
+    ipr_looseref_list_destroy (&self->selectors);
 </method>
 
 <method name = "store create" return = "store">
@@ -226,18 +238,42 @@ of this class.
 <method name = "queue delete" template = "function">
     <doc>
     Delete a queue specified by name.  Returns 0 if queue was deleted, -1 if
-    the queue did not exist.
+    the queue did not exist.  Deletes all selectors that use queue either as
+    source, or as target.
     </doc>
     <argument name = "queue name" type = "char *" />
     <local>
     xump_queue_t
         *queue;
+    ipr_looseref_t
+        *looseref;                      //  Selector reference
     </local>
     //
     queue = xump_queue_fetch (self, queue_name);
     if (queue) {
         ipr_hash_delete (self->queues, xump_queue_name (queue));
         xump_store_request_queue_delete (xump_queue_store (queue), queue);
+
+        //  Now delete all selectors that have queue as either
+        //  source or target.  This code is temporary and will be
+        //  replaced by a properly indexed structure
+        looseref = ipr_looseref_list_first (self->selectors);
+        while (looseref) {
+            xump_selector_t
+                *selector = (xump_selector_t *) (looseref->object);
+            ipr_looseref_t
+                *thisref;
+            if (streq (selector->source_queue, queue_name)
+            || (selector->target_queue
+            && streq (selector->target_queue, queue_name))) {
+                thisref = looseref;
+                looseref = ipr_looseref_list_next (&looseref);
+                ipr_looseref_destroy (&thisref);
+                xump_selector_unlink (&selector);
+            }
+            else
+                looseref = ipr_looseref_list_next (&looseref);
+        }
         xump_queue_unlink (&queue);
     }
     else
@@ -261,64 +297,37 @@ of this class.
     //
     queue = xump_queue_fetch (self, queue_name);
     if (queue) {
-        xump_store_request_selector_create (
-            xump_queue_store (queue), queue, &selector);
-        xump_queue_unlink (&queue);
-    }
-</method>
-
-<method name = "selector fetch" return = "selector">
-    <doc>
-    Fetches a selector from a queue.  This method acts as a constructor and
-    returns a new selector object when successful.  The caller must unlink
-    this selector object when finished using it.  If the queue or the selector
-    does not exist, returns NULL.
-    </doc>
-    <argument name = "self" type = "$(selftype) *" />
-    <argument name = "queue name" type = "char *" />
-    <argument name = "id" type = "uint" />
-    <declare name = "selector" type = "xump_selector_t *" default = "NULL" />
-    <local>
-    xump_queue_t
-        *queue;
-    </local>
-    //
-    queue = xump_queue_fetch (self, queue_name);
-    if (queue) {
-        xump_store_request_selector_fetch (
-            xump_queue_store (queue), queue, &selector, id);
+        selector = xump_selector_new (++self->selector_id, queue_name);
+        ipr_looseref_queue (self->selectors, xump_selector_link (selector));
         xump_queue_unlink (&queue);
     }
 </method>
 
 <method name = "selector delete" template = "function">
     <doc>
-    Deletes a selector from the queue.  Returns 0 if selector was deleted,
-    -1 if the queue or selector did not exist.
+    Deletes a specified selector.  Returns 0 if selector was deleted, or -1
+    if the queue or selector did not exist.
     </doc>
-    <argument name = "queue name" type = "char *" />
     <argument name = "id" type = "uint" />
     <local>
-    xump_queue_t
-        *queue;
-    xump_selector_t
-        *selector;
+    ipr_looseref_t
+        *looseref;                      //  Selector reference
     </local>
     //
-    queue = xump_queue_fetch (self, queue_name);
-    if (queue) {
-        selector = xump_selector_fetch (self, queue_name, id);
-        if (selector) {
-            xump_store_request_selector_delete (
-                xump_queue_store (queue), selector);
+    rc = -1;                            //  Assume we don't find selector
+    looseref = ipr_looseref_list_first (self->selectors);
+    while (looseref) {
+        xump_selector_t
+            *selector = (xump_selector_t *) (looseref->object);
+        if (selector->id == id) {
+            ipr_looseref_destroy (&looseref);
             xump_selector_unlink (&selector);
+            rc = 0;                     //  Found, and deleted
+            break;
         }
         else
-            rc = -1;
-        xump_queue_unlink (&queue);
+            looseref = ipr_looseref_list_next (&looseref);
     }
-    else
-        rc = -1;
 </method>
 
 <method name = "selftest">
@@ -383,18 +392,32 @@ of this class.
     queue = xump_queue_fetch (engine, queue_name);
     assert (queue == NULL);
 
-    //  Check that we can work with selectors
-    icl_shortstr_cpy (queue_name, "queue-001");
-    queue = xump_queue_create (engine, "store-1", queue_name);
-    selector = xump_selector_create (engine, queue_name);
+    //  Test basic selector management
+    //  -- create and delete selector normally
+    queue = xump_queue_create (engine, "store-1", NULL);
+    selector = xump_selector_create (engine, xump_queue_name (queue));
     assert (selector);
-    selector_id = xump_selector_id (selector);
+    selector_id = selector->id;
     xump_selector_unlink (&selector);
-    selector = xump_selector_fetch (engine, queue_name, selector_id);
-    assert (selector);
-    xump_selector_unlink (&selector);
-    xump_selector_delete (engine, queue_name, selector_id);
+    assert (xump_selector_delete (engine, selector_id) == 0);
     xump_queue_unlink (&queue);
+
+    //  -- create selector but do not delete (should be ok)
+    queue = xump_queue_create (engine, "store-1", NULL);
+    selector = xump_selector_create (engine, xump_queue_name (queue));
+    assert (selector);
+    xump_selector_unlink (&selector);
+    xump_queue_unlink (&queue);
+
+    //  -- create selector and then delete source queue
+    queue = xump_queue_create (engine, "store-1", NULL);
+    selector = xump_selector_create (engine, xump_queue_name (queue));
+    assert (selector);
+    selector_id = selector->id;
+    xump_selector_unlink (&selector);
+    xump_queue_delete (engine, xump_queue_name (queue));
+    xump_queue_unlink (&queue);
+    assert (xump_selector_delete (engine, selector_id) == -1);
 
 #if 0
     //  Create a queue and post messages to it
