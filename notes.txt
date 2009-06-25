@@ -4,6 +4,12 @@ Notes, in reverse chronological order.
 
 ++ 2009-06-23
 
+To implement the selector data structure I'll use ipr_index objects, which can hold 16k objects accessed by index number.  Rather than create one per queue, I'll create an array of these and add more as the total number of selectors increases.  ipr_index lets one reuse index slots nicely.
+
+Then, I'll need a list of per queue of selectors that refer to it as source or target queue.
+
+++ 2009-06-23
+
 Some changes to make:
 
 * The deliver action should act like MOVE, with a target queue, and with a destination name that is stamped onto the message envelope (as a property of the message rather than a field, probably).
